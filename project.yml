@@ -1,0 +1,59 @@
+name: Hyperdash
+options:
+  bundleIdPrefix: com.wcoetzee
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  swift-secp256k1:
+    url: https://github.com/21-DOT-DEV/swift-secp256k1
+    from: "0.21.0"
+  CryptoSwift:
+    url: https://github.com/krzyzanowskim/CryptoSwift
+    from: "1.8.0"
+
+targets:
+  Hyperdash:
+    type: application
+    platform: iOS
+    sources:
+      - path: Hyperdash
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wcoetzee.hyperdash
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "Hyperdash uses Face ID to unlock the app and authorize trades."
+    dependencies:
+      - package: swift-secp256k1
+        product: libsecp256k1
+      - package: CryptoSwift
+
+  HyperdashTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HyperdashTests
+    dependencies:
+      - target: Hyperdash
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Hyperdash:
+    build:
+      targets:
+        Hyperdash: all
+        HyperdashTests: [test]
+    test:
+      targets:
+        - HyperdashTests
