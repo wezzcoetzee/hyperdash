@@ -40,11 +40,19 @@ struct WalletDetailView: View {
     @ViewBuilder
     private func content(_ snapshot: WalletSnapshot) -> some View {
         Section {
-            AccountSummaryCard(snapshot: snapshot)
+            VaultStatGrid(snapshot: snapshot)
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
         }
 
         if !snapshot.perps.openPositions.isEmpty {
-            Section("Perp Positions") {
+            Section {
+                ShortLongRatioCard(exposure: snapshot.sideExposure)
+            }
+        }
+
+        if !snapshot.perps.openPositions.isEmpty {
+            Section("Open Positions") {
                 ForEach(snapshot.perps.openPositions, id: \.coin) { position in
                     PositionRow(
                         position: position,

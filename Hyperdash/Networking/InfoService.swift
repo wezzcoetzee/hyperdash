@@ -27,6 +27,45 @@ struct WalletSnapshot {
         spot.nonZeroBalances.reduce(0) { $0 + (usdValue(of: $1) ?? 0) }
     }
 
+    /// USDC held in the spot wallet (already dollar-denominated).
+    var spotUSDC: Double {
+        spot.balances.first(where: \.isUSDC)?.totalValue ?? 0
+    }
+
+    /// "Balance (USDC)" as shown on the copy-trade dashboard. Perp equity and spot
+    /// USDC often track the same funds, so within 10% they're treated as one balance
+    /// rather than summed, matching the reference `computeAccountValue` heuristic.
+    var accountBalanceUSDC: Double {
+        let perp = perps.accountValue
+        let spotUsdc = spotUSDC
+        guard spotUsdc > 0 else { return perp }
+        let larger = max(perp, spotUsdc)
+        let smaller = min(perp, spotUsdc)
+        if smaller / larger >= 0.9 { return larger }
+        return perp < spotUsdc ? spotUsdc : perp + spotUsdc
+    }
+
+    /// Sum of unrealized PnL across all open perp positions.
+    var totalUnrealizedPnl: Double {
+        perps.openPositions.reduce(0) { $0 + $1.unrealizedPnlValue }
+    }
+
+    /// Open-position notional exposure split by side, for the short/long ratio bar.
+    var sideExposure: SideExposure {
+        var long = SideExposure.Side()
+        var short = SideExposure.Side()
+        for position in perps.openPositions {
+            if position.isLong {
+                long.notional += position.notionalValue
+                long.count += 1
+            } else {
+                short.notional += position.notionalValue
+                short.count += 1
+            }
+        }
+        return SideExposure(long: long, short: short)
+    }
+
     /// Mark price for a perp coin.
     func mark(for coin: String) -> Double? { mids[coin] }
 
@@ -38,6 +77,23 @@ struct WalletSnapshot {
         }
         return balance.totalValue * mid
     }
+}
+
+struct SideExposure {
+    struct Side {
+        var notional: Double = 0
+        var count: Int = 0
+    }
+
+    let long: Side
+    let short: Side
+
+    var total: Double { long.notional + short.notional }
+    var longShare: Double? { total > 0 ? long.notional / total : nil }
+    var shortShare: Double? { total > 0 ? short.notional / total : nil }
+
+    /// Short-to-long exposure ratio, matching the reference dashboard's "short / long".
+    var ratio: Double? { long.notional > 0 ? short.notional / long.notional : nil }
 }
 
 struct InfoService {
