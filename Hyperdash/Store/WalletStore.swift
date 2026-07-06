@@ -9,21 +9,36 @@ final class WalletStore: ObservableObject {
     @Published private(set) var wallets: [Wallet] = []
 
     private let defaults: UserDefaults
-    private let ubiquitous = NSUbiquitousKeyValueStore.default
+    private let ubiquitous: UbiquitousKeyValueStoring
     private let storageKey = "wallets.v1"
+    private var iCloudSyncEnabled: Bool
     private var observer: NSObjectProtocol?
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        ubiquitous: UbiquitousKeyValueStoring = NSUbiquitousKeyValueStore.default,
+        iCloudSyncEnabled: Bool = false,
+        observeExternalChanges: Bool = true
+    ) {
         self.defaults = defaults
+        self.ubiquitous = ubiquitous
+        self.iCloudSyncEnabled = iCloudSyncEnabled
         load()
-        observer = NotificationCenter.default.addObserver(
-            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-            object: ubiquitous,
-            queue: .main
-        ) { [weak self] _ in
-            self?.reloadFromiCloud()
+        if observeExternalChanges {
+            let notificationObject = ubiquitous as? NSUbiquitousKeyValueStore
+            observer = NotificationCenter.default.addObserver(
+                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+                object: notificationObject,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleExternaliCloudChange()
+                }
+            }
         }
-        ubiquitous.synchronize()
+        if iCloudSyncEnabled {
+            ubiquitous.synchronize()
+        }
     }
 
     func add(name: String, address: String, agentKeyHex: String?, synchronizable: Bool) throws {
@@ -64,6 +79,26 @@ final class WalletStore: ObservableObject {
         KeyStore.agentKey(for: wallet.id)
     }
 
+    func setiCloudSyncEnabled(_ enabled: Bool, migrateKeys: Bool = true) {
+        guard enabled != iCloudSyncEnabled else { return }
+        iCloudSyncEnabled = enabled
+
+        if migrateKeys {
+            migrateAgentKeys(synchronizable: enabled)
+        }
+
+        if enabled {
+            persist()
+            ubiquitous.synchronize()
+        } else {
+            if let data = encodedWallets() {
+                defaults.set(data, forKey: storageKey)
+            }
+            ubiquitous.removeObject(forKey: storageKey)
+            ubiquitous.synchronize()
+        }
+    }
+
     private func normalizeKey(_ hex: String) -> String {
         var k = hex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if !k.hasPrefix("0x") { k = "0x" + k }
@@ -71,23 +106,38 @@ final class WalletStore: ObservableObject {
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(wallets) else { return }
+        guard let data = encodedWallets() else { return }
         defaults.set(data, forKey: storageKey)
-        ubiquitous.set(data, forKey: storageKey)
+        if iCloudSyncEnabled {
+            ubiquitous.set(data, forKey: storageKey)
+        }
     }
 
     private func load() {
-        if let data = ubiquitous.data(forKey: storageKey) ?? defaults.data(forKey: storageKey),
+        let cloudData = iCloudSyncEnabled ? ubiquitous.data(forKey: storageKey) : nil
+        if let data = cloudData ?? defaults.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([Wallet].self, from: data) {
             wallets = decoded
         }
     }
 
-    private func reloadFromiCloud() {
+    func handleExternaliCloudChange() {
+        guard iCloudSyncEnabled else { return }
         if let data = ubiquitous.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([Wallet].self, from: data) {
             wallets = decoded
             defaults.set(data, forKey: storageKey)
+        }
+    }
+
+    private func encodedWallets() -> Data? {
+        try? JSONEncoder().encode(wallets)
+    }
+
+    private func migrateAgentKeys(synchronizable: Bool) {
+        for wallet in wallets {
+            guard let key = KeyStore.agentKey(for: wallet.id) else { continue }
+            try? KeyStore.saveAgentKey(key, for: wallet.id, synchronizable: synchronizable)
         }
     }
 }
