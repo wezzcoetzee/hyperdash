@@ -28,6 +28,7 @@ struct VaultStatGrid: View {
 struct VaultStatCard: View {
     let label: String
     let value: String
+    var subtitle: String? = nil
     var tint: Color = .primary
 
     var body: some View {
@@ -42,6 +43,11 @@ struct VaultStatCard: View {
                 .foregroundStyle(tint)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .padding(12)
