@@ -7,6 +7,9 @@ struct WalletDetailView: View {
     @EnvironmentObject private var store: WalletStore
     @StateObject private var model: WalletDetailViewModel
     @State private var tradeContext: TradeContext?
+    @State private var priceAlertCoin: AlertCoin?
+
+    private struct AlertCoin: Identifiable { let coin: String; var id: String { coin } }
 
     init(wallet: Wallet) {
         self.wallet = wallet
@@ -34,6 +37,9 @@ struct WalletDetailView: View {
             TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
                 Task { await model.load(session: settings.session) }
             }
+        }
+        .sheet(item: $priceAlertCoin) { item in
+            AddPriceAlertView(coin: item.coin)
         }
     }
 
@@ -65,6 +71,12 @@ struct WalletDetailView: View {
                             } label: { Label("Close", systemImage: "xmark.circle") }
                             .tint(.red)
                         }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            priceAlertCoin = AlertCoin(coin: position.coin)
+                        } label: { Label("Alert", systemImage: "bell") }
+                        .tint(.indigo)
                     }
                 }
             }

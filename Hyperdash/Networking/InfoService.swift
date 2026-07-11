@@ -105,6 +105,12 @@ struct InfoService {
         return raw.mapValues { $0.hlDouble }
     }
 
+    /// Perps account state only — used by the alert runner, which needs open
+    /// positions and liquidation prices but not the full spot/orders snapshot.
+    func perpsState(address: String) async throws -> PerpsState {
+        try await client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
+    }
+
     func snapshot(address: String) async throws -> WalletSnapshot {
         async let perps = client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
         async let spot = client.info(["type": "spotClearinghouseState", "user": address], as: SpotState.self)

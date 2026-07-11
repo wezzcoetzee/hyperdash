@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var alerts: AlertStore
+    @State private var notificationsDenied = false
 
     var body: some View {
         NavigationStack {
@@ -37,6 +39,30 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Liquidation alerts", isOn: liquidationBinding)
+                    if alerts.config.liquidationEnabled {
+                        Stepper(
+                            "Warn within \(Int(alerts.config.liquidationThresholdPct))%",
+                            value: $alerts.config.liquidationThresholdPct,
+                            in: 1...50, step: 1
+                        )
+                    }
+                    NavigationLink {
+                        PriceAlertsView()
+                    } label: {
+                        LabeledContent("Price alerts", value: pendingPriceAlertsLabel)
+                    }
+                } header: {
+                    Text("Alerts")
+                } footer: {
+                    if notificationsDenied {
+                        Text("Notifications are turned off. Enable them for Hyperdash in the iOS Settings app.")
+                    } else {
+                        Text("Delivered via background refresh, so timing depends on iOS and may be delayed. Not a substitute for a stop order.")
+                    }
+                }
+
+                Section {
                     Toggle("Sync wallets via iCloud", isOn: $settings.iCloudSyncEnabled)
                 } header: {
                     Text("iCloud")
@@ -53,6 +79,28 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+        }
+    }
+
+    private var liquidationBinding: Binding<Bool> {
+        Binding(
+            get: { alerts.config.liquidationEnabled },
+            set: { enabled in
+                alerts.config.liquidationEnabled = enabled
+                if enabled { requestAuthorization() }
+            }
+        )
+    }
+
+    private var pendingPriceAlertsLabel: String {
+        let count = alerts.config.priceAlerts.filter(\.isPending).count
+        return count == 0 ? "None" : "\(count)"
+    }
+
+    private func requestAuthorization() {
+        Task {
+            let granted = await AlertScheduler.requestAuthorization()
+            notificationsDenied = !granted
         }
     }
 
