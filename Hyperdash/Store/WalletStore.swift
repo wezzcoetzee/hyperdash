@@ -41,9 +41,15 @@ final class WalletStore: ObservableObject {
         }
     }
 
-    func add(name: String, address: String, agentKeyHex: String?, synchronizable: Bool) throws {
+    func add(
+        name: String,
+        address: String,
+        icon: WalletIcon = .wallet,
+        agentKeyHex: String?,
+        synchronizable: Bool
+    ) throws {
         let hasKey = agentKeyHex.map { !$0.isEmpty } ?? false
-        let wallet = Wallet(name: name, address: address, keyAddedAt: hasKey ? Date() : nil)
+        let wallet = Wallet(name: name, address: address, icon: icon, keyAddedAt: hasKey ? Date() : nil)
         if let key = agentKeyHex, !key.isEmpty {
             try KeyStore.saveAgentKey(normalizeKey(key), for: wallet.id, synchronizable: synchronizable)
         }

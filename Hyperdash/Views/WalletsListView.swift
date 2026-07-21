@@ -77,9 +77,10 @@ struct WalletRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "wallet.bifold.fill")
+            Image(systemName: wallet.icon.rawValue)
                 .foregroundStyle(.tint)
                 .font(.title2)
+                .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(wallet.name).font(.headline)

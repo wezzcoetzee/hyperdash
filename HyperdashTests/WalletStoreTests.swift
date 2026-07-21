@@ -176,6 +176,33 @@ final class WalletStoreTests: XCTestCase {
         let wallets = try JSONDecoder().decode([Wallet].self, from: Data(json.utf8))
         XCTAssertEqual(wallets.count, 1)
         XCTAssertNil(wallets.first?.keyAddedAt)
+        XCTAssertEqual(wallets.first?.icon, .wallet)
+    }
+
+    func testPersistsSelectedWalletIcon() throws {
+        let defaults = makeDefaults()
+        let store = WalletStore(
+            defaults: defaults,
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+
+        try store.add(
+            name: "Trading",
+            address: address,
+            icon: .trading,
+            agentKeyHex: nil,
+            synchronizable: false
+        )
+
+        let reloaded = WalletStore(
+            defaults: defaults,
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+        XCTAssertEqual(reloaded.wallets.first?.icon, .trading)
     }
 
     private func makeDefaults() -> UserDefaults {

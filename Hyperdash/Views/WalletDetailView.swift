@@ -37,6 +37,20 @@ struct WalletDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(wallet.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Wallet icon", selection: iconSelection) {
+                        ForEach(WalletIcon.allCases) { icon in
+                            Label(icon.label, systemImage: icon.rawValue).tag(icon)
+                        }
+                    }
+                } label: {
+                    Image(systemName: currentWallet.icon.rawValue)
+                }
+                .accessibilityLabel("Choose wallet icon")
+            }
+        }
         .refreshable { await model.load(session: settings.session) }
         .task(id: settings.network) { await model.load(session: settings.session) }
         .task(id: settings.network) {
@@ -59,6 +73,17 @@ struct WalletDetailView: View {
                 }
             }
         }
+    }
+
+    private var iconSelection: Binding<WalletIcon> {
+        Binding(
+            get: { currentWallet.icon },
+            set: { newIcon in
+                var updated = currentWallet
+                updated.icon = newIcon
+                store.update(updated)
+            }
+        )
     }
 
     @ViewBuilder

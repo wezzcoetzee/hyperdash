@@ -11,6 +11,7 @@ struct EditAgentKeyView: View {
     @State private var agentKey = ""
     @State private var errorMessage: String?
     @State private var confirmRemoval = false
+    @FocusState private var agentKeyFocused: Bool
 
     private var hasExistingKey: Bool { store.hasAgentKey(wallet) }
 
@@ -22,6 +23,7 @@ struct EditAgentKeyView: View {
                         .font(.body.monospaced())
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($agentKeyFocused)
                 } header: {
                     Text(hasExistingKey ? "Replace Key" : "Add Key")
                 } footer: {
@@ -59,6 +61,12 @@ struct EditAgentKeyView: View {
                 Button("Remove", role: .destructive) { save(nil) }
             } message: {
                 Text("You can add a new key at any time.")
+            }
+            .onAppear {
+                // Defer until after the sheet presentation finishes; immediate focus is often ignored.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    agentKeyFocused = true
+                }
             }
         }
     }
