@@ -60,6 +60,23 @@ enum Fixtures {
     {"universe": [{"name": "ETH", "szDecimals": 4}]}
     """#
 
+    static let portfolio = #"""
+    [
+      ["day",     {"accountValueHistory": [[1000, "100"], [2000, "110"]], "pnlHistory": [[1000, "0"], [2000, "10"]], "vlm": "0"}],
+      ["week",    {"accountValueHistory": [[1000, "90"], [2000, "110"]],  "pnlHistory": [[1000, "-5"], [2000, "10"]], "vlm": "0"}],
+      ["month",   {"accountValueHistory": [], "pnlHistory": [], "vlm": "0"}],
+      ["allTime", {"accountValueHistory": [[1000, "50"]], "pnlHistory": [[1000, "0"]], "vlm": "0"}],
+      ["perpDay", {"accountValueHistory": [], "pnlHistory": [], "vlm": "0"}]
+    ]
+    """#
+
+    static let extraAgents = #"""
+    [
+      {"name": "hyperdash", "address": "0x00000000000000000000000000000000000000aa", "validUntil": 4102444800000},
+      {"name": "other",     "address": "0x00000000000000000000000000000000000000bb", "validUntil": 1000000000000}
+    ]
+    """#
+
     static let longETHPosition = #"""
     {
       "coin": "ETH", "szi": "1.5", "entryPx": "1800", "positionValue": "3000",

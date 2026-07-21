@@ -96,6 +96,40 @@ struct SideExposure {
     var ratio: Double? { long.notional > 0 ? short.notional / long.notional : nil }
 }
 
+extension SideExposure {
+    static func combined(_ exposures: [SideExposure]) -> SideExposure {
+        var long = Side()
+        var short = Side()
+        for e in exposures {
+            long.notional += e.long.notional;  long.count += e.long.count
+            short.notional += e.short.notional; short.count += e.short.count
+        }
+        return SideExposure(long: long, short: short)
+    }
+}
+
+struct ExtraAgent: Decodable, Equatable {
+    let name: String
+    let address: String
+    let validUntil: Date
+
+    enum CodingKeys: String, CodingKey { case name, address, validUntil }
+
+    init(name: String, address: String, validUntil: Date) {
+        self.name = name
+        self.address = address
+        self.validUntil = validUntil
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        address = try c.decode(String.self, forKey: .address)
+        let ms = try c.decode(Double.self, forKey: .validUntil)
+        validUntil = Date(timeIntervalSince1970: ms / 1000)
+    }
+}
+
 struct InfoService {
     let client: HyperliquidClient
     let meta: MetaService
@@ -109,6 +143,14 @@ struct InfoService {
     /// positions and liquidation prices but not the full spot/orders snapshot.
     func perpsState(address: String) async throws -> PerpsState {
         try await client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
+    }
+
+    func portfolio(address: String) async throws -> PortfolioResponse {
+        try await client.info(["type": "portfolio", "user": address], as: PortfolioResponse.self)
+    }
+
+    func extraAgents(address: String) async throws -> [ExtraAgent] {
+        try await client.info(["type": "extraAgents", "user": address], as: [ExtraAgent].self)
     }
 
     func snapshot(address: String) async throws -> WalletSnapshot {

@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: WalletStore
+    @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
     @StateObject private var model = DashboardViewModel()
 
     private let columns = [
@@ -16,7 +17,7 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if store.wallets.isEmpty {
                         emptyState
-                    } else if case .failed(let message) = model.state {
+                    } else if case .failed(let message) = model.state, !model.hasLoaded {
                         errorState(message)
                     } else {
                         stats
@@ -31,8 +32,16 @@ struct DashboardView: View {
                     NetworkBadge(network: settings.network)
                 }
             }
-            .refreshable { await model.load(wallets: store.wallets, session: settings.session) }
-            .task(id: reloadKey) { await model.load(wallets: store.wallets, session: settings.session) }
+            .refreshable {
+                await model.load(wallets: store.wallets, session: settings.session)
+                await expiryStore.refresh(wallets: store.wallets, session: settings.session,
+                                          keyProvider: store.agentKey)
+            }
+            .task(id: reloadKey) {
+                await model.load(wallets: store.wallets, session: settings.session)
+                await expiryStore.refresh(wallets: store.wallets, session: settings.session,
+                                          keyProvider: store.agentKey)
+            }
         }
     }
 
@@ -48,6 +57,11 @@ struct DashboardView: View {
         Text("All configured Hyperliquid wallets.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
+
+        let warnings = expiryStore.expiringSoon
+        if !warnings.isEmpty {
+            keyWarnings(warnings)
+        }
 
         let totals = model.totals
         LazyVGrid(columns: columns, spacing: 12) {
@@ -68,6 +82,42 @@ struct DashboardView: View {
             VaultStatCard(label: "Wallets", value: "\(totals.walletCount)")
                 .redacted(reason: loading ? .placeholder : [])
         }
+
+        if totals.exposure.total > 0 {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Open Interest".uppercased())
+                    .font(.caption2.weight(.semibold)).tracking(0.5)
+                    .foregroundStyle(.secondary)
+                ShortLongRatioCard(exposure: totals.exposure)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            .redacted(reason: loading ? .placeholder : [])
+        }
+
+        PortfolioChartCard(title: "Account Value", period: $model.chartPeriod,
+                           points: model.accountValueChart, kind: .accountValue)
+            .redacted(reason: loading ? .placeholder : [])
+        PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
+                           points: model.pnlChart, kind: .pnl)
+            .redacted(reason: loading ? .placeholder : [])
+    }
+
+    private func keyWarnings(_ ids: [UUID: AgentKeyExpiry]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Agent keys need attention", systemImage: "key.slash")
+                .font(.headline).foregroundStyle(.cautionText)
+            ForEach(store.wallets.filter { ids[$0.id] != nil }) { wallet in
+                HStack {
+                    Text(wallet.name).font(.subheadline)
+                    Spacer()
+                    AgentKeyBadge(expiry: ids[wallet.id]!)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.caution.opacity(Theme.badgeFillOpacity), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var emptyState: some View {

@@ -4,11 +4,13 @@ struct Wallet: Identifiable, Codable, Equatable, Hashable {
     let id: UUID
     var name: String
     var address: String
+    var keyAddedAt: Date?
 
-    init(id: UUID = UUID(), name: String, address: String) {
+    init(id: UUID = UUID(), name: String, address: String, keyAddedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.address = Wallet.normalize(address)
+        self.keyAddedAt = keyAddedAt
     }
 
     /// Hyperliquid expects lowercased hex addresses when signing.

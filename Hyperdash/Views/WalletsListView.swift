@@ -3,6 +3,7 @@ import SwiftUI
 struct WalletsListView: View {
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
     @State private var showingAdd = false
 
     var body: some View {
@@ -35,7 +36,8 @@ struct WalletsListView: View {
         List {
             ForEach(store.wallets) { wallet in
                 NavigationLink(value: wallet) {
-                    WalletRow(wallet: wallet, hasKey: store.hasAgentKey(wallet))
+                    WalletRow(wallet: wallet, hasKey: store.hasAgentKey(wallet),
+                              expiry: expiryStore.expiries[wallet.id])
                 }
             }
             .onDelete { indexSet in
@@ -45,6 +47,15 @@ struct WalletsListView: View {
         .navigationDestination(for: Wallet.self) { wallet in
             WalletDetailView(wallet: wallet)
         }
+        .task(id: refreshKey) {
+            await expiryStore.refresh(wallets: store.wallets, session: settings.session,
+                                      keyProvider: store.agentKey)
+        }
+    }
+
+    /// Re-run agent-key expiry refresh when the network changes or wallets are added/removed.
+    private var refreshKey: String {
+        "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).joined())"
     }
 
     private var emptyState: some View {
@@ -62,6 +73,7 @@ struct WalletsListView: View {
 struct WalletRow: View {
     let wallet: Wallet
     let hasKey: Bool
+    var expiry: AgentKeyExpiry?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -76,14 +88,21 @@ struct WalletRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if hasKey {
-                Image(systemName: "key.fill")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-                    .accessibilityLabel("Trading enabled")
-            }
+            keyIndicator
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var keyIndicator: some View {
+        if let expiry, expiry.status() != .healthy {
+            AgentKeyBadge(expiry: expiry, compact: true)
+        } else if hasKey {
+            Image(systemName: "key.fill")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+                .accessibilityLabel("Trading enabled")
+        }
     }
 }
 

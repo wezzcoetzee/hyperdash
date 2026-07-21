@@ -12,6 +12,8 @@ final class WalletDetailViewModel: ObservableObject {
 
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var snapshot: WalletSnapshot?
+    @Published private(set) var portfolio: PortfolioResponse?
+    @Published var chartPeriod: PortfolioPeriod = .week
 
     let wallet: Wallet
 
@@ -19,14 +21,24 @@ final class WalletDetailViewModel: ObservableObject {
         self.wallet = wallet
     }
 
+    func accountValueChart(_ period: PortfolioPeriod) -> [PortfolioPoint] {
+        portfolio?.accountValueSeries(period) ?? []
+    }
+
+    func pnlChart(_ period: PortfolioPeriod) -> [PortfolioPoint] {
+        portfolio?.pnlSeries(period) ?? []
+    }
+
     func load(session: HyperliquidSession) async {
         if snapshot == nil { state = .loading }
         do {
-            let snap = try await session.info.snapshot(address: wallet.address)
-            snapshot = snap
+            async let snap = session.info.snapshot(address: wallet.address)
+            let port = try? await session.info.portfolio(address: wallet.address)
+            snapshot = try await snap
+            if let port { portfolio = port }
             state = .loaded
         } catch {
-            state = .failed(error.userMessage)
+            if snapshot == nil { state = .failed(error.userMessage) }
         }
     }
 }

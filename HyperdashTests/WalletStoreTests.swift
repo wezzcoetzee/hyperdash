@@ -148,6 +148,36 @@ final class WalletStoreTests: XCTestCase {
         XCTAssertEqual(store.wallets.map(\.name), ["Cloud"])
     }
 
+    func testAddWithKeySetsKeyAddedAt() throws {
+        let store = WalletStore(
+            defaults: makeDefaults(),
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+        let key = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        try store.add(name: "Main", address: address, agentKeyHex: key, synchronizable: false)
+        XCTAssertNotNil(store.wallets.first?.keyAddedAt)
+    }
+
+    func testAddWithoutKeyLeavesKeyAddedAtNil() throws {
+        let store = WalletStore(
+            defaults: makeDefaults(),
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: false)
+        XCTAssertNil(store.wallets.first?.keyAddedAt)
+    }
+
+    func testDecodesLegacyWalletWithoutKeyAddedAt() throws {
+        let json = #"[{"id":"\#(UUID().uuidString)","name":"Legacy","address":"\#(address)"}]"#
+        let wallets = try JSONDecoder().decode([Wallet].self, from: Data(json.utf8))
+        XCTAssertEqual(wallets.count, 1)
+        XCTAssertNil(wallets.first?.keyAddedAt)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "WalletStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

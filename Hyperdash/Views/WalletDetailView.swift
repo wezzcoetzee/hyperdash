@@ -5,9 +5,11 @@ struct WalletDetailView: View {
 
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: WalletStore
+    @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
     @StateObject private var model: WalletDetailViewModel
     @State private var tradeContext: TradeContext?
     @State private var priceAlertCoin: AlertCoin?
+    @State private var editingAgentKey = false
 
     private struct AlertCoin: Identifiable { let coin: String; var id: String { coin } }
 
@@ -17,6 +19,10 @@ struct WalletDetailView: View {
     }
 
     private var canTrade: Bool { store.hasAgentKey(wallet) }
+
+    private var currentWallet: Wallet {
+        store.wallets.first { $0.id == wallet.id } ?? wallet
+    }
 
     var body: some View {
         List {
@@ -33,6 +39,10 @@ struct WalletDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.load(session: settings.session) }
         .task(id: settings.network) { await model.load(session: settings.session) }
+        .task(id: settings.network) {
+            await expiryStore.refresh(wallets: store.wallets, session: settings.session,
+                                      keyProvider: store.agentKey)
+        }
         .sheet(item: $tradeContext) { context in
             TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
                 Task { await model.load(session: settings.session) }
@@ -40,6 +50,14 @@ struct WalletDetailView: View {
         }
         .sheet(item: $priceAlertCoin) { item in
             AddPriceAlertView(coin: item.coin)
+        }
+        .sheet(isPresented: $editingAgentKey) {
+            EditAgentKeyView(wallet: currentWallet) {
+                Task {
+                    await expiryStore.refresh(wallets: store.wallets, session: settings.session,
+                                              keyProvider: store.agentKey)
+                }
+            }
         }
     }
 
@@ -55,6 +73,17 @@ struct WalletDetailView: View {
             Section {
                 ShortLongRatioCard(exposure: snapshot.sideExposure)
             }
+        }
+
+        Section {
+            PortfolioChartCard(title: "Account Value", period: $model.chartPeriod,
+                               points: model.accountValueChart(model.chartPeriod), kind: .accountValue)
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
+            PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
+                               points: model.pnlChart(model.chartPeriod), kind: .pnl)
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
         }
 
         if !snapshot.perps.openPositions.isEmpty {
@@ -118,11 +147,26 @@ struct WalletDetailView: View {
         Section {
             LabeledContent("Address", value: wallet.shortAddress)
                 .font(.footnote)
+            if canTrade, let expiry = expiryStore.expiries[wallet.id] {
+                LabeledContent("Agent key") {
+                    AgentKeyBadge(expiry: expiry)
+                }
+                .font(.footnote)
+                if expiry.source == .estimated {
+                    Text("Estimated from key add date.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if !canTrade {
                 Label("Read-only — add an agent key to trade", systemImage: "eye")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            Button(canTrade ? "Replace agent key…" : "Add agent key…") {
+                editingAgentKey = true
+            }
+            .font(.footnote)
         }
     }
 

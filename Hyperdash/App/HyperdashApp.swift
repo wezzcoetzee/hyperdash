@@ -5,6 +5,7 @@ struct HyperdashApp: App {
     @StateObject private var walletStore: WalletStore
     @StateObject private var settings: AppSettings
     @StateObject private var alerts: AlertStore
+    @StateObject private var expiryStore = AgentKeyExpiryStore()
     @StateObject private var lock = AppLock()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -30,6 +31,7 @@ struct HyperdashApp: App {
                 .environmentObject(walletStore)
                 .environmentObject(settings)
                 .environmentObject(alerts)
+                .environmentObject(expiryStore)
                 .environmentObject(lock)
                 .preferredColorScheme(settings.appearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in
