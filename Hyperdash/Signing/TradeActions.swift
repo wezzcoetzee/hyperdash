@@ -11,14 +11,15 @@ enum TradeActions {
         isBuy ? mark * (1 + slippage) : mark * (1 - slippage)
     }
 
-    static func orderAction(
+    /// A single order in the wire format shared by one-off and bulk actions.
+    static func orderEntry(
         asset: AssetInfo,
         isBuy: Bool,
         price: Double,
         size: Double,
         reduceOnly: Bool
     ) -> MsgPackValue {
-        let order = MsgPackValue.map([
+        .map([
             ("a", .int(asset.assetId)),
             ("b", .bool(isBuy)),
             ("p", .string(Wire.price(price, szDecimals: asset.szDecimals, isSpot: asset.isSpot))),
@@ -26,17 +27,36 @@ enum TradeActions {
             ("r", .bool(reduceOnly)),
             ("t", .map([("limit", .map([("tif", .string("Ioc"))]))]))
         ])
-        return .map([
+    }
+
+    static func orderAction(
+        asset: AssetInfo,
+        isBuy: Bool,
+        price: Double,
+        size: Double,
+        reduceOnly: Bool
+    ) -> MsgPackValue {
+        ordersAction([orderEntry(asset: asset, isBuy: isBuy, price: price, size: size, reduceOnly: reduceOnly)])
+    }
+
+    /// Batches several orders into one signed action.
+    static func ordersAction(_ orders: [MsgPackValue]) -> MsgPackValue {
+        .map([
             ("type", .string("order")),
-            ("orders", .array([order])),
+            ("orders", .array(orders)),
             ("grouping", .string("na"))
         ])
     }
 
     static func cancelAction(assetId: Int, oid: Int) -> MsgPackValue {
+        cancelsAction([(assetId: assetId, oid: oid)])
+    }
+
+    /// Batches several cancels into one signed action.
+    static func cancelsAction(_ cancels: [(assetId: Int, oid: Int)]) -> MsgPackValue {
         .map([
             ("type", .string("cancel")),
-            ("cancels", .array([.map([("a", .int(assetId)), ("o", .int(oid))])]))
+            ("cancels", .array(cancels.map { .map([("a", .int($0.assetId)), ("o", .int($0.oid))]) }))
         ])
     }
 }

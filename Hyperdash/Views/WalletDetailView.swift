@@ -111,6 +111,20 @@ struct WalletDetailView: View {
                 .listRowBackground(Color.clear)
         }
 
+        let openPositions = snapshot.perps.openPositions
+        if canTrade && (!openPositions.isEmpty || !snapshot.openOrders.isEmpty) {
+            Section {
+                Button(role: .destructive) {
+                    tradeContext = .closeAll(positions: openPositions, orders: snapshot.openOrders)
+                } label: {
+                    Label("Close all positions & orders", systemImage: "xmark.octagon")
+                        .frame(maxWidth: .infinity)
+                }
+            } footer: {
+                Text("Markets out every open position and cancels every resting order.")
+            }
+        }
+
         if !snapshot.perps.openPositions.isEmpty {
             Section("Open Positions") {
                 ForEach(snapshot.perps.openPositions, id: \.coin) { position in

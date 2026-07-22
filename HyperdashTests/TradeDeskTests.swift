@@ -50,6 +50,44 @@ final class TradeDeskTests: XCTestCase {
         XCTAssertNotNil(plan.warning)
     }
 
+    func testPrepareCloseAllBatchesReduceOnlyOrderAndCancel() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let order = try JSONDecoder().decode(OpenOrder.self, from: Data(#"""
+        {"coin": "ETH", "side": "B", "limitPx": "1500", "sz": "0.5", "oid": 42, "timestamp": 0}
+        """#.utf8))
+
+        let plan = try await desk.prepare(.closeAll(positions: [try longETH], orders: [order]))
+
+        // Two signed submissions: a batched reduce-only order and a batched cancel.
+        XCTAssertEqual(plan.actions.count, 2)
+
+        let expectedOrder = TradeActions.ordersAction([
+            TradeActions.orderEntry(
+                asset: AssetInfo(assetId: 0, szDecimals: 4, isSpot: false, midKey: "ETH"),
+                isBuy: false,
+                price: TradeActions.aggressivePrice(mark: 2000, isBuy: false),
+                size: 1.5,
+                reduceOnly: true
+            )
+        ])
+        XCTAssertEqual(plan.actions[0].encoded(), expectedOrder.encoded())
+
+        let expectedCancel = TradeActions.cancelsAction([(assetId: 0, oid: 42)])
+        XCTAssertEqual(plan.actions[1].encoded(), expectedCancel.encoded())
+    }
+
+    func testPrepareCloseAllWithOnlyOrdersSkipsOrderAction() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let order = try JSONDecoder().decode(OpenOrder.self, from: Data(#"""
+        {"coin": "ETH", "side": "B", "limitPx": "1500", "sz": "0.5", "oid": 42, "timestamp": 0}
+        """#.utf8))
+
+        let plan = try await desk.prepare(.closeAll(positions: [], orders: [order]))
+
+        XCTAssertEqual(plan.actions.count, 1)
+        XCTAssertEqual(plan.actions[0].encoded(), TradeActions.cancelsAction([(assetId: 0, oid: 42)]).encoded())
+    }
+
     func testExecuteSubmitsAndReturnsReceipt() async throws {
         let filled = #"""
         {"status": "ok", "response": {"type": "order", "data": {"statuses": [
