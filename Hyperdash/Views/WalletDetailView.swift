@@ -117,7 +117,7 @@ struct WalletDetailView: View {
                 Button(role: .destructive) {
                     tradeContext = .closeAll(positions: openPositions, orders: snapshot.openOrders)
                 } label: {
-                    Label("Close all positions & orders", systemImage: "xmark.octagon.fill")
+                    Text("Close all positions & orders")
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
