@@ -14,7 +14,7 @@ struct VaultStatGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 12) {
             VaultStatCard(label: "Balance (USDC)", value: Format.usd(snapshot.accountBalanceUSDC))
-            VaultStatCard(label: "Account Leverage", value: Format.leverage(snapshot.perps.accountLeverage))
+            VaultStatCard(label: "Account Leverage", value: Format.leverage(snapshot.accountLeverage))
             VaultStatCard(
                 label: "Total P/L",
                 value: Format.signedUSD(pnl),

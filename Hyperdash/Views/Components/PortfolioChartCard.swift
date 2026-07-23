@@ -52,22 +52,53 @@ struct PortfolioChartCard: View {
 
     private var chart: some View {
         Chart(points, id: \.date) { p in
-            LineMark(x: .value("Time", p.date), y: .value("Value", p.value))
-                .interpolationMethod(.monotone)
-                .foregroundStyle(lineColor)
             AreaMark(x: .value("Time", p.date), y: .value("Value", p.value))
                 .interpolationMethod(.monotone)
-                .foregroundStyle(lineColor.opacity(0.12))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [lineColor.opacity(0.22), lineColor.opacity(0.0)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+            LineMark(x: .value("Time", p.date), y: .value("Value", p.value))
+                .interpolationMethod(.monotone)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(lineColor)
+
+            if let last = points.last, p.date == last.date {
+                PointMark(x: .value("Time", last.date), y: .value("Value", last.value))
+                    .symbolSize(60)
+                    .foregroundStyle(lineColor)
+            }
         }
+        .chartYScale(domain: yDomain)
         .chartYAxis {
-            AxisMarks { value in
-                AxisGridLine()
+            AxisMarks(preferredPosition: .trailing, values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
                 AxisValueLabel {
-                    if let v = value.as(Double.self) { Text(Format.usd(v, fractionDigits: 0)) }
+                    if let v = value.as(Double.self) {
+                        Text(Format.usd(v, fractionDigits: 0))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
-        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisValueLabel()
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
         .frame(height: 160)
+    }
+
+    private var yDomain: ClosedRange<Double> {
+        let values = points.map(\.value)
+        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        if lo == hi { return (lo - 1)...(hi + 1) }
+        let pad = (hi - lo) * 0.15
+        return (lo - pad)...(hi + pad)
     }
 }

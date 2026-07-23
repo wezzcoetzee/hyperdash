@@ -45,6 +45,14 @@ struct WalletSnapshot {
         return perp < spotUsdc ? spotUsdc : perp + spotUsdc
     }
 
+    /// Gross open-position exposure divided by the same USDC balance shown on
+    /// the wallet dashboard.
+    var accountLeverage: Double {
+        let balance = accountBalanceUSDC
+        guard balance > 0 else { return 0 }
+        return sideExposure.total / balance
+    }
+
     /// Sum of unrealized PnL across all open perp positions.
     var totalUnrealizedPnl: Double {
         perps.openPositions.reduce(0) { $0 + $1.unrealizedPnlValue }

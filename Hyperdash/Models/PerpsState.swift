@@ -24,13 +24,6 @@ struct PerpsState: Decodable {
 
     var withdrawableValue: Double { withdrawable.hlDouble }
 
-    /// Account-wide leverage: notional exposure divided by account value.
-    var accountLeverage: Double {
-        let value = accountValue
-        guard value > 0 else { return 0 }
-        return marginSummary.totalNtlPos.hlDouble / value
-    }
-
     var openPositions: [Position] {
         assetPositions.map(\.position).filter { $0.size != 0 }
     }

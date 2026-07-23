@@ -45,4 +45,41 @@ final class WalletSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.mark(for: "ETH"), 2000.0)
         XCTAssertNil(snapshot.mark(for: "DOGE"))
     }
+
+    func testAccountLeverageUsesDisplayedBalanceAndOpenPositionExposure() throws {
+        let perpsJSON = #"""
+        {
+          "marginSummary": {"accountValue": "8208.30", "totalNtlPos": "71400", "totalRawUsd": "0", "totalMarginUsed": "0"},
+          "crossMarginSummary": {"accountValue": "8208.30", "totalNtlPos": "71400", "totalRawUsd": "0", "totalMarginUsed": "0"},
+          "crossMaintenanceMarginUsed": "0",
+          "withdrawable": "0",
+          "assetPositions": [
+            {"type": "oneWay", "position": {
+              "coin": "ETH", "szi": "1", "entryPx": "22500", "positionValue": "22500",
+              "unrealizedPnl": "0", "returnOnEquity": "0", "liquidationPx": null,
+              "marginUsed": "0", "maxLeverage": 50,
+              "leverage": {"type": "cross", "value": 10},
+              "cumFunding": {"allTime": "0", "sinceOpen": "0", "sinceChange": "0"}
+            }}
+          ],
+          "time": 0
+        }
+        """#
+        let spotJSON = #"""
+        {"balances": []}
+        """#
+        let perps = try JSONDecoder().decode(PerpsState.self, from: Data(perpsJSON.utf8))
+        let spot = try JSONDecoder().decode(SpotState.self, from: Data(spotJSON.utf8))
+        let snapshot = WalletSnapshot(
+            perps: perps,
+            spot: spot,
+            openOrders: [],
+            mids: [:],
+            spotMidKeys: [:]
+        )
+
+        XCTAssertEqual(snapshot.accountBalanceUSDC, 8208.30, accuracy: 0.001)
+        XCTAssertEqual(snapshot.sideExposure.total, 22_500, accuracy: 0.001)
+        XCTAssertEqual(snapshot.accountLeverage, 22_500 / 8208.30, accuracy: 0.001)
+    }
 }

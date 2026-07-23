@@ -29,8 +29,8 @@ struct AccountSummaryCard: View {
             if !perps.openPositions.isEmpty {
                 Divider()
                 metricsRow([
-                    Metric("Account Leverage", Format.leverage(perps.accountLeverage),
-                           tint: leverageTint(perps.accountLeverage)),
+                    Metric("Account Leverage", Format.leverage(snapshot.accountLeverage),
+                           tint: leverageTint(snapshot.accountLeverage)),
                     Metric("Margin Used", Format.usd(perps.totalMarginUsed)),
                     Metric("Maint. Margin", Format.usd(perps.maintenanceMarginUsed))
                 ])
