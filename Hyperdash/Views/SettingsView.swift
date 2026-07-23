@@ -70,8 +70,6 @@ struct SettingsView: View {
                     Text("Syncs wallet names, addresses, and agent keys across your devices using iCloud Keychain. Applies to keys saved after enabling.")
                 }
 
-                GitHubFeedbackSettingsSection()
-
                 Section("About") {
                     LabeledContent("Version", value: appVersion)
                     Link("Hyperliquid API docs",
@@ -110,46 +108,5 @@ struct SettingsView: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         return "\(v) (\(b))"
-    }
-}
-
-struct GitHubFeedbackSettingsSection: View {
-    @State private var token = ""
-    @State private var saved = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        Section {
-            SecureField("github_pat_...", text: $token)
-                .textContentType(.password)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            Button("Save Token") { save() }
-                .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            if saved {
-                Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-            }
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-            }
-            Link(destination: GitHubFeedbackConfig.tokenHelpURL) {
-                Label("Create a token on GitHub", systemImage: "arrow.up.right.square")
-            }
-        } header: {
-            Text("Feedback (GitHub)")
-        } footer: {
-            Text("Shake your device to file feedback as a GitHub issue. \(GitHubFeedbackConfig.tokenNotice)")
-        }
-        .onAppear { token = GitHubTokenStore.load() ?? "" }
-    }
-
-    private func save() {
-        do {
-            try GitHubTokenStore.save(token.trimmingCharacters(in: .whitespacesAndNewlines))
-            saved = true
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 }

@@ -3,7 +3,6 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var lock: AppLock
-    @State private var feedbackController = FeedbackController()
 
     private var isLocked: Bool {
         settings.biometricLockEnabled && !lock.isUnlocked
@@ -16,16 +15,6 @@ struct RootView: View {
             } else {
                 MainTabView()
             }
-        }
-        .onShake {
-            guard !isLocked, !feedbackController.isPresented else { return }
-            feedbackController.begin(screenName: nil)
-        }
-        .sheet(isPresented: $feedbackController.isPresented) {
-            FeedbackView(
-                screenshot: feedbackController.screenshot,
-                screenName: feedbackController.screenName
-            )
         }
     }
 }
