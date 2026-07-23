@@ -73,7 +73,7 @@ struct PortfolioChartCard: View {
         }
         .chartYScale(domain: yDomain)
         .chartYAxis {
-            AxisMarks(preferredPosition: .trailing, values: .automatic(desiredCount: 3)) { value in
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
