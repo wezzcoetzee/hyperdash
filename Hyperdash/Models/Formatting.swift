@@ -42,6 +42,11 @@ enum Format {
         "\(number(value, fractionDigits: fractionDigits))%"
     }
 
+    static func signedPercent(_ value: Double, fractionDigits: Int = 2) -> String {
+        let sign = value >= 0 ? "+" : "-"
+        return "\(sign)\(number(abs(value), fractionDigits: fractionDigits))%"
+    }
+
     static func leverage(_ value: Double) -> String {
         "\(number(value, fractionDigits: value >= 10 ? 0 : 1))x"
     }
