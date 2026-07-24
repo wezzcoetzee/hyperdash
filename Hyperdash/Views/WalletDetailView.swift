@@ -89,7 +89,7 @@ struct WalletDetailView: View {
     @ViewBuilder
     private func content(_ snapshot: WalletSnapshot) -> some View {
         Section {
-            VaultStatGrid(snapshot: snapshot)
+            AccountSummaryCard(snapshot: snapshot)
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 .listRowBackground(Color.clear)
         }
@@ -240,7 +240,7 @@ struct WalletDetailView: View {
             .accessibilityLabel("Loading account summary")
         }
 
-        Section("Perp Positions") {
+        Section("Open Positions") {
             ForEach(0..<2, id: \.self) { _ in skeletonRow }
         }
     }

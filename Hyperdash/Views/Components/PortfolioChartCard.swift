@@ -65,7 +65,8 @@ struct PortfolioChartCard: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
     }
 
     private var chart: some View {

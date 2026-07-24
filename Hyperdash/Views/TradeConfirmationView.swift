@@ -28,7 +28,8 @@ struct TradeConfirmationView: View {
                 case .success(let message):
                     result(icon: "checkmark.seal.fill", tint: .gain, title: "Success", message: message)
                 case .failed(let message):
-                    result(icon: "xmark.octagon.fill", tint: .loss, title: "Failed", message: message)
+                    result(icon: "xmark.octagon.fill", tint: .loss, title: "Failed",
+                           message: Self.humanizedFailure(message))
                 case .ready:
                     confirmation
                 }
@@ -99,6 +100,31 @@ struct TradeConfirmationView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+
+    /// Turns the terser Hyperliquid failure strings into plain guidance for the
+    /// high-stakes moment. Unknown errors pass through unchanged.
+    static func humanizedFailure(_ raw: String) -> String {
+        let lower = raw.lowercased()
+        if lower.contains("insufficient") && lower.contains("margin") {
+            return "Not enough margin for this order. Reduce the size or add funds, then try again."
+        }
+        if lower.contains("insufficient") {
+            return "Not enough balance for this order. Reduce the size, then try again."
+        }
+        if lower.contains("reduce only") || lower.contains("reduce-only") {
+            return "This would increase the position, but it was sent as reduce-only. Close or flip the position instead."
+        }
+        if lower.contains("post only") || lower.contains("post-only") {
+            return "A post-only order would have filled immediately. Adjust the price so it rests on the book."
+        }
+        if lower.contains("zero size") || lower.contains("must be greater") {
+            return "The order size rounds to zero. Increase the amount and try again."
+        }
+        if lower.contains("http 429") || lower.contains("rate limit") {
+            return "Hyperliquid is rate-limiting requests. Wait a moment and try again."
+        }
+        return raw
     }
 
     private func submit() async {

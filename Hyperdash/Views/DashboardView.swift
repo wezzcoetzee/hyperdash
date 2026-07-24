@@ -64,24 +64,8 @@ struct DashboardView: View {
         }
 
         let totals = model.totals
-        LazyVGrid(columns: columns, spacing: 12) {
-            VaultStatCard(
-                label: "Total Balance",
-                value: Format.usd(totals.balance),
-                subtitle: "Live exchange data"
-            )
+        DashboardSummaryCard(totals: totals)
             .redacted(reason: loading ? .placeholder : [])
-            VaultStatCard(
-                label: "Open PnL",
-                value: Format.signedUSD(totals.openPnl),
-                tint: totals.openPnl == 0 ? .primary : .directionText(isPositive: totals.openPnl >= 0)
-            )
-            .redacted(reason: loading ? .placeholder : [])
-            VaultStatCard(label: "Open Exposure", value: Format.usd(totals.openExposure))
-                .redacted(reason: loading ? .placeholder : [])
-            VaultStatCard(label: "Wallets", value: "\(totals.walletCount)")
-                .redacted(reason: loading ? .placeholder : [])
-        }
 
         if model.topWinner != nil || model.topLoser != nil {
             VStack(alignment: .leading, spacing: 12) {
@@ -108,7 +92,8 @@ struct DashboardView: View {
                 ShortLongRatioCard(exposure: totals.exposure)
             }
             .padding(12)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
             .redacted(reason: loading ? .placeholder : [])
         }
 
@@ -134,7 +119,8 @@ struct DashboardView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.caution.opacity(Theme.badgeFillOpacity), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.caution.opacity(Theme.badgeFillOpacity),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
     }
 
     private var emptyState: some View {

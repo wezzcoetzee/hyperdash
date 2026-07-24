@@ -27,6 +27,9 @@ enum Theme {
     static let badgeFillOpacity: Double = 0.18
     static let networkFillOpacity: Double = 0.22
 
+    /// `rounded.surface` from DESIGN.md — the one corner radius for cards and surfaces.
+    static let surfaceRadius: CGFloat = 10
+
     static let gainLight = UIColor(red: 0.07, green: 0.44, blue: 0.22, alpha: 1)
     static let lossLight = UIColor(red: 0.75, green: 0.0, blue: 0.10, alpha: 1)
     static let cautionLight = UIColor(red: 0.62, green: 0.37, blue: 0.0, alpha: 1)

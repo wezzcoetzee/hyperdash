@@ -1,57 +1,80 @@
 import SwiftUI
 
-/// Grid of headline account stats, styled after the copy-trade vault dashboard.
-struct VaultStatGrid: View {
-    let snapshot: WalletSnapshot
-
-    private var pnl: Double { snapshot.totalUnrealizedPnl }
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
+/// The dashboard's headline: one dominant total balance in the Stocks-style
+/// SF Rounded figure, with the rest of the portfolio totals as a quiet
+/// supporting row beneath it.
+struct DashboardSummaryCard: View {
+    let totals: DashboardViewModel.Totals
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            VaultStatCard(label: "Balance (USDC)", value: Format.usd(snapshot.accountBalanceUSDC))
-            VaultStatCard(label: "Account Leverage", value: Format.leverage(snapshot.accountLeverage))
-            VaultStatCard(
-                label: "Total P/L",
-                value: Format.signedUSD(pnl),
-                tint: pnl == 0 ? .primary : .directionText(isPositive: pnl >= 0)
-            )
-            VaultStatCard(label: "Open Positions", value: "\(snapshot.perps.openPositions.count)")
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Total Balance")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(Format.usd(totals.balance))
+                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+
+            Divider()
+
+            SummaryMetricsRow(metrics: [
+                .init("Open PnL", Format.signedUSD(totals.openPnl),
+                      tint: totals.openPnl == 0 ? .primary : .directionText(isPositive: totals.openPnl >= 0)),
+                .init("Open Exposure", Format.usd(totals.openExposure)),
+                .init("Wallets", "\(totals.walletCount)")
+            ])
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
     }
 }
 
-struct VaultStatCard: View {
-    let label: String
+/// A row of small supporting metrics beneath a hero figure. Shared by the
+/// dashboard and wallet-detail summaries; collapses to a column when tight.
+struct SummaryMetric: Identifiable {
+    var id: String { title }
+    let title: String
     let value: String
-    var subtitle: String? = nil
-    var tint: Color = .primary
+    let tint: Color
+
+    init(_ title: String, _ value: String, tint: Color = .primary) {
+        self.title = title
+        self.value = value
+        self.tint = tint
+    }
+}
+
+struct SummaryMetricsRow: View {
+    let metrics: [SummaryMetric]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(.title2, design: .rounded).weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(tint)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top) {
+                ForEach(metrics.indices, id: \.self) { index in
+                    cell(metrics[index])
+                    if index < metrics.count - 1 { Spacer(minLength: 8) }
+                }
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(metrics) { cell($0) }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func cell(_ metric: SummaryMetric) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(metric.title).font(.caption2).foregroundStyle(.secondary)
+            Text(metric.value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(metric.tint)
+        }
     }
 }
 
@@ -93,7 +116,8 @@ struct WalletPnLCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
     }
 }
 
@@ -158,6 +182,7 @@ struct ShortLongRatioCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color(.tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
     }
 }
