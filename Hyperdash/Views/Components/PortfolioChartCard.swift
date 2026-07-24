@@ -14,7 +14,7 @@ struct PortfolioChartCard: View {
 
     private var lineColor: Color {
         switch kind {
-        case .accountValue: return Theme.brandMint
+        case .accountValue: return .brandMint
         case .pnl:
             let last = points.last?.value ?? 0
             return last == 0 ? .secondary : .directionText(isPositive: last >= 0)
@@ -111,6 +111,9 @@ struct PortfolioChartCard: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .chartPlotStyle { plotArea in
+            plotArea.clipped()
+        }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine().foregroundStyle(Color.secondary.opacity(0.10))
