@@ -62,6 +62,20 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertGreaterThan(model.totals.balance, 0)
     }
 
+    func testSurfacesTopWinnerFromPositivePnL() async {
+        let model = DashboardViewModel()
+        let wallets = [Wallet(name: "Good", address: goodAddress)]
+
+        await model.load(wallets: wallets, session: session(failing: nil))
+
+        let winner = try? XCTUnwrap(model.topWinner)
+        XCTAssertEqual(winner?.name, "Good")
+        XCTAssertGreaterThan(winner?.pnl ?? 0, 0)
+        XCTAssertGreaterThan(winner?.pnlPercent ?? 0, 0)
+        // A single wallet can't be both winner and loser.
+        XCTAssertNil(model.topLoser)
+    }
+
     func testAllSnapshotsFailingReportsError() async {
         let model = DashboardViewModel()
         let wallets = [Wallet(name: "Broken", address: failAddress)]

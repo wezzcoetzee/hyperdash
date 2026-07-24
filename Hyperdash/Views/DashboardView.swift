@@ -83,6 +83,23 @@ struct DashboardView: View {
                 .redacted(reason: loading ? .placeholder : [])
         }
 
+        if model.topWinner != nil || model.topLoser != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("PnL Leaders".uppercased())
+                    .font(.caption2.weight(.semibold)).tracking(0.5)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: columns, spacing: 12) {
+                    if let winner = model.topWinner {
+                        WalletPnLCard(title: "Top Winner", entry: winner)
+                    }
+                    if let loser = model.topLoser {
+                        WalletPnLCard(title: "Top Loser", entry: loser)
+                    }
+                }
+            }
+            .redacted(reason: loading ? .placeholder : [])
+        }
+
         if totals.exposure.total > 0 {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Open Interest".uppercased())
