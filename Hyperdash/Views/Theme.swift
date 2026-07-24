@@ -10,6 +10,10 @@ extension ShapeStyle where Self == Color {
         isPositive ? .green : .red
     }
 
+    /// Hyperliquid mint (#32E7CD). Used explicitly in Swift Charts, which does
+    /// not inherit the app's `.accentColor` tint and otherwise falls back to blue.
+    static var brandMint: Color { Color(red: 0.196, green: 0.906, blue: 0.804) }
+
     static var gainText: Color { Theme.adaptive(light: Theme.gainLight, dark: .systemGreen) }
     static var lossText: Color { Theme.adaptive(light: Theme.lossLight, dark: .systemRed) }
     static var cautionText: Color { Theme.adaptive(light: Theme.cautionLight, dark: .systemOrange) }
