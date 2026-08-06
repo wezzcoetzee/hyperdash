@@ -7,20 +7,35 @@ struct WalletSnapshot {
     let perps: PerpsState
     let spot: SpotState
     let openOrders: [OpenOrder]
+    let abstraction: AccountAbstraction
     private let mids: [String: Double]
     private let spotMidKeys: [String: String]
 
     init(perps: PerpsState, spot: SpotState, openOrders: [OpenOrder],
+         abstraction: AccountAbstraction = .standard,
          mids: [String: Double], spotMidKeys: [String: String]) {
         self.perps = perps
         self.spot = spot
         self.openOrders = openOrders
+        self.abstraction = abstraction
         self.mids = mids
         self.spotMidKeys = spotMidKeys
     }
 
+    /// Under unified account and portfolio margin the spot clearinghouse already
+    /// holds the perp collateral, so `spotUSDValue` is the whole account and
+    /// adding perps equity would double-count it. Only a standard account keeps
+    /// the two balances apart and sums them.
     var totalAccountValue: Double {
-        perps.accountValue + spotUSDValue
+        valuesFromSpotAlone ? spotUSDValue : perps.accountValue + spotUSDValue
+    }
+
+    /// Whether this wallet's totals come from the spot side alone. A unified
+    /// account whose spot side prices to nothing — an unreachable spot state, or
+    /// holdings with no mid — would otherwise report a $0 account while the perp
+    /// state plainly shows equity, so summing stays the fallback there.
+    var valuesFromSpotAlone: Bool {
+        abstraction.spotHoldsWholeAccount && spotUSDValue > 0
     }
 
     var spotUSDValue: Double {
@@ -32,10 +47,13 @@ struct WalletSnapshot {
         spot.balances.first(where: \.isUSDC)?.totalValue ?? 0
     }
 
-    /// "Balance (USDC)" as shown on the copy-trade dashboard. Perp equity and spot
-    /// USDC often track the same funds, so within 10% they're treated as one balance
-    /// rather than summed, matching the reference `computeAccountValue` heuristic.
+    /// "Balance (USDC)" as shown on the copy-trade dashboard. A unified account
+    /// needs no reconciling — its spot side already covers everything backing the
+    /// positions. For a standard account, perp equity and spot USDC often track
+    /// the same funds, so within 10% they're treated as one balance rather than
+    /// summed, matching the reference `computeAccountValue` heuristic.
     var accountBalanceUSDC: Double {
+        guard !valuesFromSpotAlone else { return spotUSDValue }
         let perp = perps.accountValue
         let spotUsdc = spotUSDC
         guard spotUsdc > 0 else { return perp }
@@ -161,11 +179,20 @@ struct InfoService {
         try await client.info(["type": "extraAgents", "user": address], as: [ExtraAgent].self)
     }
 
+    /// Which balances back this address's positions. Older nodes and testnet
+    /// deployments may not serve `userAbstraction` at all, so an unusable
+    /// response means "standard" rather than a failed snapshot.
+    func abstraction(address: String) async -> AccountAbstraction {
+        (try? await client.info(["type": "userAbstraction", "user": address],
+                                as: AccountAbstraction.self)) ?? .standard
+    }
+
     func snapshot(address: String) async throws -> WalletSnapshot {
         async let perps = client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
         async let spot = client.info(["type": "spotClearinghouseState", "user": address], as: SpotState.self)
         async let orders = client.info(["type": "frontendOpenOrders", "user": address], as: [OpenOrder].self)
         async let mids = allMids()
+        async let mode = abstraction(address: address)
 
         let spotState = try await spot
         var spotMidKeys: [String: String] = [:]
@@ -176,7 +203,7 @@ struct InfoService {
         }
 
         return try await WalletSnapshot(
-            perps: perps, spot: spotState, openOrders: orders,
+            perps: perps, spot: spotState, openOrders: orders, abstraction: mode,
             mids: mids, spotMidKeys: spotMidKeys
         )
     }

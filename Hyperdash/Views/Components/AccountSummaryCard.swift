@@ -21,7 +21,7 @@ struct AccountSummaryCard: View {
             Divider()
 
             SummaryMetricsRow(metrics: [
-                .init("Perps Equity", Format.usd(perps.accountValue)),
+                perpsMetric,
                 .init("Spot Value", Format.usd(snapshot.spotUSDValue)),
                 .init("Withdrawable", Format.usd(perps.withdrawableValue))
             ])
@@ -37,6 +37,18 @@ struct AccountSummaryCard: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// A unified account's perps equity is a slice of the spot balance shown
+    /// beside it, so printing it here reads as double counting against the total.
+    /// Open PnL is the part of the perp state that isn't already in spot.
+    private var perpsMetric: SummaryMetric {
+        guard snapshot.valuesFromSpotAlone else {
+            return .init("Perps Equity", Format.usd(perps.accountValue))
+        }
+        let pnl = snapshot.totalUnrealizedPnl
+        return .init("Unrealized PnL", Format.signedUSD(pnl),
+                     tint: pnl == 0 ? .primary : .directionText(isPositive: pnl > 0))
     }
 
     private func leverageTint(_ leverage: Double) -> Color {
