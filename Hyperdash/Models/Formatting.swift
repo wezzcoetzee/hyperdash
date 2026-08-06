@@ -51,6 +51,23 @@ enum Format {
         "\(number(value, fractionDigits: value >= 10 ? 0 : 1))x"
     }
 
+    /// Abbreviated currency for axis labels, where "$75K" costs a third of the
+    /// width of "$75,000" and reads just as fast.
+    static func abbreviatedUSD(_ value: Double) -> String {
+        let sign = value < 0 ? "-" : ""
+        let n = abs(value)
+        switch n {
+        case 0..<1_000:
+            return "\(sign)$\(number(n, fractionDigits: n < 10 && n != n.rounded() ? 2 : 0))"
+        case 1_000..<1_000_000:
+            return "\(sign)$\(number(n / 1_000, fractionDigits: n < 10_000 ? 1 : 0))K"
+        case 1_000_000..<1_000_000_000:
+            return "\(sign)$\(number(n / 1_000_000, fractionDigits: n < 10_000_000 ? 1 : 0))M"
+        default:
+            return "\(sign)$\(number(n / 1_000_000_000, fractionDigits: 1))B"
+        }
+    }
+
     /// Compact price formatting that keeps precision for low-priced assets.
     static func price(_ value: Double) -> String {
         let digits: Int

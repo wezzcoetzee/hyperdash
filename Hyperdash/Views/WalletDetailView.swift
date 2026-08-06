@@ -214,30 +214,24 @@ struct WalletDetailView: View {
         }
     }
 
+    /// Mirrors `content(_:)` section for section — summary, charts, then
+    /// positions — so the loaded screen fills the placeholder in place instead
+    /// of shoving it down the page. The summary and chart placeholders are the
+    /// real components in their loading state, not copies of them.
     @ViewBuilder
     private var loadingSkeleton: some View {
         Section {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Total Value").font(.caption).foregroundStyle(.secondary)
-                    Text("$000,000.00")
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                }
-                Divider()
-                HStack {
-                    ForEach(["Perps Equity", "Spot Value", "Withdrawable"], id: \.self) { title in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(title).font(.caption2).foregroundStyle(.secondary)
-                            Text("$0,000.00").font(.subheadline.weight(.semibold)).monospacedDigit()
-                        }
-                        Spacer(minLength: 8)
-                    }
-                }
+            AccountSummaryCard()
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
+        }
+
+        Section {
+            ForEach(["Account Value", "PnL"], id: \.self) { title in
+                PortfolioChartCard.Placeholder(title: title)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    .listRowBackground(Color.clear)
             }
-            .padding(.vertical, 4)
-            .redacted(reason: .placeholder)
-            .accessibilityLabel("Loading account summary")
         }
 
         Section("Open Positions") {

@@ -68,12 +68,11 @@ struct AddWalletView: View {
                     Button("Save") { save() }.disabled(!canSave)
                 }
             }
-            .onAppear {
-                // Defer until after the sheet presentation finishes; immediate focus is often ignored.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    nameFocused = true
-                }
-            }
+            // Declarative default focus, evaluated once the sheet's focus scope
+            // is established. Setting `nameFocused` from `onAppear` lands before
+            // the presentation transition finishes and gets dropped, which is
+            // why this used to be a timed guess.
+            .defaultFocus($nameFocused, true)
         }
     }
 
