@@ -98,7 +98,7 @@ struct PortfolioChartCard: View {
 
     // MARK: - Chart
 
-    private static let plotHeight: CGFloat = 172
+    fileprivate static let plotHeight: CGFloat = 172
 
     private func chart(_ frame: Frame) -> some View {
         Chart {
@@ -220,6 +220,53 @@ struct PortfolioChartCard: View {
         case .week: return .dateTime.weekday(.abbreviated).hour().minute()
         case .month: return .dateTime.month(.abbreviated).day()
         case .allTime: return .dateTime.month(.abbreviated).day().year()
+        }
+    }
+}
+
+// MARK: - Loading placeholder
+
+extension PortfolioChartCard {
+    /// The card's chrome at its real dimensions, for the loading state. It lives
+    /// beside the card it stands in for so the two keep the same height, padding
+    /// and header shape as either one changes.
+    struct Placeholder: View {
+        let title: String
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title.uppercased())
+                            .font(.caption2.weight(.semibold)).tracking(0.5)
+                            .foregroundStyle(.secondary)
+                        Text("+$0,000.00 (+0.0%)")
+                            .font(.caption2.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    Spacer()
+                    Text("$00,000.00")
+                        .font(.system(.subheadline, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                }
+
+                Picker("Period", selection: .constant(PortfolioPeriod.week)) {
+                    ForEach(PortfolioPeriod.allCases) { p in Text(p.label).tag(p) }
+                }
+                .pickerStyle(.segmented)
+                .disabled(true)
+
+                RoundedRectangle(cornerRadius: Theme.surfaceRadius)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: PortfolioChartCard.plotHeight)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
+            .redacted(reason: .placeholder)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: "Loading \(title) chart"))
         }
     }
 }

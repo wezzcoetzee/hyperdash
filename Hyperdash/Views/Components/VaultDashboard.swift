@@ -78,46 +78,46 @@ struct SummaryMetricsRow: View {
     }
 }
 
-/// Highlights a single wallet's open PnL — used for the dashboard's best and
-/// worst performers, ranked by PnL as a share of balance.
-struct WalletPnLCard: View {
+/// A single wallet's open PnL — the dashboard's best and worst performers,
+/// ranked by PnL as a share of balance.
+///
+/// Deliberately a row rather than a card: the balance above is the screen's one
+/// headline, and a pair of equal-weight cards with their own display figures
+/// competes with it.
+struct WalletPnLRow: View {
     let title: String
     let entry: DashboardViewModel.WalletPnL
 
-    private var isPositive: Bool { entry.pnlPercent >= 0 }
-    private var tint: Color { .directionText(isPositive: isPositive) }
+    private var tint: Color { .directionText(isPositive: entry.pnlPercent >= 0) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.semibold))
-                .tracking(0.5)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: entry.icon.rawValue)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(Format.signedPercent(entry.pnlPercent))
-                .font(.system(.title2, design: .rounded).weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(tint)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-            HStack(spacing: 6) {
-                Image(systemName: entry.icon.rawValue)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
                     .lineLimit(1)
-                Spacer(minLength: 0)
-                Text(Format.signedUSD(entry.pnl))
-                    .font(.caption.weight(.semibold))
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Format.signedPercent(entry.pnlPercent))
+                    .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(tint)
+                Text(Format.signedUSD(entry.pnl))
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
+            .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
+        .accessibilityElement(children: .combine)
     }
 }
 

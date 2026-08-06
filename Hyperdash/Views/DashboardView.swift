@@ -6,11 +6,6 @@ struct DashboardView: View {
     @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
     @StateObject private var model = DashboardViewModel()
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -72,15 +67,20 @@ struct DashboardView: View {
                 Text("PnL Leaders".uppercased())
                     .font(.caption2.weight(.semibold)).tracking(0.5)
                     .foregroundStyle(.secondary)
-                LazyVGrid(columns: columns, spacing: 12) {
-                    if let winner = model.topWinner {
-                        WalletPnLCard(title: "Top Winner", entry: winner)
-                    }
-                    if let loser = model.topLoser {
-                        WalletPnLCard(title: "Top Loser", entry: loser)
-                    }
+                if let winner = model.topWinner {
+                    WalletPnLRow(title: "Top winner", entry: winner)
+                }
+                if model.topWinner != nil && model.topLoser != nil {
+                    Divider()
+                }
+                if let loser = model.topLoser {
+                    WalletPnLRow(title: "Top loser", entry: loser)
                 }
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
             .redacted(reason: loading ? .placeholder : [])
         }
 
@@ -97,12 +97,17 @@ struct DashboardView: View {
             .redacted(reason: loading ? .placeholder : [])
         }
 
-        PortfolioChartCard(title: "Account Value", period: $model.chartPeriod,
-                           points: model.accountValueChart, kind: .accountValue)
-            .redacted(reason: loading ? .placeholder : [])
-        PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
-                           points: model.pnlChart, kind: .pnl)
-            .redacted(reason: loading ? .placeholder : [])
+        // Redacting a live chart still draws its line; the placeholder holds the
+        // same footprint without pretending to have data.
+        if loading {
+            PortfolioChartCard.Placeholder(title: "Account Value")
+            PortfolioChartCard.Placeholder(title: "PnL")
+        } else {
+            PortfolioChartCard(title: "Account Value", period: $model.chartPeriod,
+                               points: model.accountValueChart, kind: .accountValue)
+            PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
+                               points: model.pnlChart, kind: .pnl)
+        }
     }
 
     private func keyWarnings(_ ids: [UUID: AgentKeyExpiry]) -> some View {
