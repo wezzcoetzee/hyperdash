@@ -29,6 +29,18 @@ final class DashboardViewModel: ObservableObject {
         let pnlPercent: Double
     }
 
+    /// One spot asset merged across every tracked wallet, so two wallets holding
+    /// BTC report a single line. `usdValue` is nil only when no wallet could
+    /// price the coin.
+    struct SpotHolding: Identifiable, Equatable {
+        let coin: String
+        let amount: Double
+        let usdValue: Double?
+        let walletCount: Int
+
+        var id: String { coin }
+    }
+
     private struct WalletData {
         let wallet: Wallet
         let snapshot: WalletSnapshot
@@ -40,6 +52,8 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var portfolios: [PortfolioResponse] = []
     @Published private(set) var topWinner: WalletPnL?
     @Published private(set) var topLoser: WalletPnL?
+    @Published private(set) var topDollarWinner: WalletPnL?
+    @Published private(set) var spotHoldings: [SpotHolding] = []
     @Published private(set) var hasLoaded = false
     @Published var chartPeriod: PortfolioPeriod = .week
 
@@ -55,6 +69,7 @@ final class DashboardViewModel: ObservableObject {
         guard !wallets.isEmpty else {
             totals = Totals()
             portfolios = []
+            spotHoldings = []
             hasLoaded = true
             state = .loaded
             return
@@ -99,6 +114,7 @@ final class DashboardViewModel: ObservableObject {
         next.exposure = SideExposure.combined(results.map { $0.snapshot.sideExposure })
         totals = next
         rankPnL(results)
+        spotHoldings = Self.mergeSpot(results)
         hasLoaded = true
         state = .loaded
     }
@@ -121,5 +137,38 @@ final class DashboardViewModel: ObservableObject {
         topWinner = ranked.first { $0.pnlPercent > 0 }
         let loser = ranked.last { $0.pnlPercent < 0 }
         topLoser = (loser?.id == topWinner?.id) ? nil : loser
+
+        // The percentage leader is often a small wallet; the dollar leader is the
+        // one that actually moved the portfolio. Only worth its own row when the
+        // two are different wallets.
+        let byDollars = ranked.max { $0.pnl < $1.pnl }
+        topDollarWinner = (byDollars?.pnl ?? 0) > 0 && byDollars?.id != topWinner?.id ? byDollars : nil
+    }
+
+    /// Merges every wallet's spot balances into one line per coin, summing both
+    /// the token amount and its USD value.
+    private static func mergeSpot(_ results: [WalletData]) -> [SpotHolding] {
+        var merged: [String: (amount: Double, usd: Double, priced: Bool, wallets: Int)] = [:]
+        for data in results {
+            for balance in data.snapshot.spot.nonZeroBalances {
+                var entry = merged[balance.coin] ?? (0, 0, false, 0)
+                entry.amount += balance.totalValue
+                if let usd = data.snapshot.usdValue(of: balance) {
+                    entry.usd += usd
+                    entry.priced = true
+                }
+                entry.wallets += 1
+                merged[balance.coin] = entry
+            }
+        }
+        return merged.map { coin, entry in
+            SpotHolding(coin: coin, amount: entry.amount,
+                        usdValue: entry.priced ? entry.usd : nil,
+                        walletCount: entry.wallets)
+        }
+        .sorted { a, b in
+            let left = a.usdValue ?? 0, right = b.usdValue ?? 0
+            return left == right ? a.coin < b.coin : left > right
+        }
     }
 }

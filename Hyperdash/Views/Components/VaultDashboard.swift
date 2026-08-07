@@ -87,6 +87,8 @@ struct SummaryMetricsRow: View {
 struct WalletPnLRow: View {
     let title: String
     let entry: DashboardViewModel.WalletPnL
+    /// Ranks the row by dollars rather than percentage, leading with the amount.
+    var leadsWithDollars = false
 
     private var tint: Color { .directionText(isPositive: entry.pnlPercent >= 0) }
 
@@ -106,18 +108,71 @@ struct WalletPnLRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(Format.signedPercent(entry.pnlPercent))
+                Text(leadsWithDollars ? Format.signedUSD(entry.pnl)
+                                      : Format.signedPercent(entry.pnlPercent))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(tint)
-                Text(Format.signedUSD(entry.pnl))
+                Text(leadsWithDollars ? Format.signedPercent(entry.pnlPercent)
+                                      : Format.signedUSD(entry.pnl))
                     .font(.caption2)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             .lineLimit(1)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Spot exposure pooled across every tracked wallet, one line per coin, so a
+/// token split over two wallets reads as a single position.
+struct SpotHoldingsCard: View {
+    let holdings: [DashboardViewModel.SpotHolding]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Spot Holdings".uppercased())
+                .font(.caption2.weight(.semibold)).tracking(0.5)
+                .foregroundStyle(.secondary)
+            ForEach(Array(holdings.enumerated()), id: \.element.id) { index, holding in
+                if index > 0 { Divider() }
+                row(holding)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
+    }
+
+    private func row(_ holding: DashboardViewModel.SpotHolding) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(holding.coin).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(subtitle(holding))
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Text(holding.usdValue.map { Format.usd($0) } ?? "—")
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private func subtitle(_ holding: DashboardViewModel.SpotHolding) -> String {
+        let amount = Format.number(holding.amount, fractionDigits: 4)
+        guard holding.walletCount > 1 else { return amount }
+        return "\(amount) · \(holding.walletCount) wallets"
     }
 }
 

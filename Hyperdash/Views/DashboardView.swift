@@ -22,6 +22,9 @@ struct DashboardView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Dashboard")
+            .navigationDestination(for: Wallet.self) { wallet in
+                WalletDetailView(wallet: wallet)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NetworkBadge(network: settings.network)
@@ -68,13 +71,18 @@ struct DashboardView: View {
                     .font(.caption2.weight(.semibold)).tracking(0.5)
                     .foregroundStyle(.secondary)
                 if let winner = model.topWinner {
-                    WalletPnLRow(title: "Top winner", entry: winner)
+                    pnlLeader(WalletPnLRow(title: "Top winner", entry: winner), id: winner.id)
+                }
+                if let dollarWinner = model.topDollarWinner {
+                    Divider()
+                    pnlLeader(WalletPnLRow(title: "Biggest gain", entry: dollarWinner,
+                                           leadsWithDollars: true), id: dollarWinner.id)
                 }
                 if model.topWinner != nil && model.topLoser != nil {
                     Divider()
                 }
                 if let loser = model.topLoser {
-                    WalletPnLRow(title: "Top loser", entry: loser)
+                    pnlLeader(WalletPnLRow(title: "Top loser", entry: loser), id: loser.id)
                 }
             }
             .padding(12)
@@ -82,6 +90,11 @@ struct DashboardView: View {
             .background(Color(.secondarySystemGroupedBackground),
                         in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
             .redacted(reason: loading ? .placeholder : [])
+        }
+
+        if !model.spotHoldings.isEmpty {
+            SpotHoldingsCard(holdings: model.spotHoldings)
+                .redacted(reason: loading ? .placeholder : [])
         }
 
         if totals.exposure.total > 0 {
@@ -107,6 +120,18 @@ struct DashboardView: View {
                                points: model.accountValueChart, kind: .accountValue)
             PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
                                points: model.pnlChart, kind: .pnl)
+        }
+    }
+
+    /// Makes a leader row tap through to its wallet. Falls back to a plain row if
+    /// the wallet vanished between load and render.
+    @ViewBuilder
+    private func pnlLeader(_ row: WalletPnLRow, id: UUID) -> some View {
+        if let wallet = store.wallets.first(where: { $0.id == id }) {
+            NavigationLink(value: wallet) { row }
+                .buttonStyle(.plain)
+        } else {
+            row
         }
     }
 

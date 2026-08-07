@@ -76,6 +76,37 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertNil(model.topLoser)
     }
 
+    func testMergesSpotHoldingsAcrossWallets() async {
+        let model = DashboardViewModel()
+        let wallets = [
+            Wallet(name: "One", address: goodAddress),
+            Wallet(name: "Two", address: "0x00000000000000000000000000000000000000c3")
+        ]
+
+        await model.load(wallets: wallets, session: session(failing: nil))
+
+        // Both wallets answer with the same spot fixture, so every coin appears
+        // once at double the single-wallet amount.
+        XCTAssertEqual(Set(model.spotHoldings.map(\.coin)).count, model.spotHoldings.count)
+        let purr = model.spotHoldings.first { $0.coin == "PURR" }
+        XCTAssertEqual(purr?.walletCount, 2)
+
+        let single = DashboardViewModel()
+        await single.load(wallets: [wallets[0]], session: session(failing: nil))
+        let singlePurr = single.spotHoldings.first { $0.coin == "PURR" }
+        XCTAssertEqual(purr?.amount ?? 0, (singlePurr?.amount ?? 0) * 2, accuracy: 0.0001)
+        XCTAssertEqual(purr?.usdValue ?? 0, (singlePurr?.usdValue ?? 0) * 2, accuracy: 0.0001)
+    }
+
+    func testSpotHoldingsSortedByValueDescending() async {
+        let model = DashboardViewModel()
+        await model.load(wallets: [Wallet(name: "One", address: goodAddress)],
+                         session: session(failing: nil))
+
+        let values = model.spotHoldings.map { $0.usdValue ?? 0 }
+        XCTAssertEqual(values, values.sorted(by: >))
+    }
+
     func testAllSnapshotsFailingReportsError() async {
         let model = DashboardViewModel()
         let wallets = [Wallet(name: "Broken", address: failAddress)]
