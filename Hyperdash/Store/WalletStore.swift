@@ -76,6 +76,11 @@ final class WalletStore: ObservableObject {
         persist()
     }
 
+    func move(fromOffsets source: IndexSet, toOffset destination: Int) {
+        wallets.move(fromOffsets: source, toOffset: destination)
+        persist()
+    }
+
     func remove(_ wallet: Wallet) {
         try? KeyStore.deleteAgentKey(for: wallet.id)
         wallets.removeAll { $0.id == wallet.id }

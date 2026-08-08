@@ -205,6 +205,31 @@ final class WalletStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.wallets.first?.icon, .trading)
     }
 
+    func testMovePersistsNewOrder() throws {
+        let defaults = makeDefaults()
+        let store = WalletStore(
+            defaults: defaults,
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+        try store.add(name: "First", address: address, agentKeyHex: nil, synchronizable: false)
+        try store.add(name: "Second", address: address, agentKeyHex: nil, synchronizable: false)
+        try store.add(name: "Third", address: address, agentKeyHex: nil, synchronizable: false)
+
+        store.move(fromOffsets: IndexSet(integer: 2), toOffset: 0)
+
+        XCTAssertEqual(store.wallets.map(\.name), ["Third", "First", "Second"])
+
+        let reloaded = WalletStore(
+            defaults: defaults,
+            ubiquitous: FakeUbiquitousStore(),
+            iCloudSyncEnabled: false,
+            observeExternalChanges: false
+        )
+        XCTAssertEqual(reloaded.wallets.map(\.name), ["Third", "First", "Second"])
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "WalletStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

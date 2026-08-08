@@ -25,6 +25,11 @@ struct WalletsListView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     NetworkBadge(network: settings.network)
                 }
+                if !store.wallets.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        EditButton()
+                    }
+                }
             }
             .sheet(isPresented: $showingAdd) {
                 AddWalletView()
@@ -43,6 +48,9 @@ struct WalletsListView: View {
             .onDelete { indexSet in
                 indexSet.map { store.wallets[$0] }.forEach(store.remove)
             }
+            .onMove { source, destination in
+                store.move(fromOffsets: source, toOffset: destination)
+            }
         }
         .navigationDestination(for: Wallet.self) { wallet in
             WalletDetailView(wallet: wallet)
@@ -54,8 +62,9 @@ struct WalletsListView: View {
     }
 
     /// Re-run agent-key expiry refresh when the network changes or wallets are added/removed.
+    /// Sorted so reordering wallets doesn't trigger a refresh.
     private var refreshKey: String {
-        "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).joined())"
+        "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).sorted().joined())"
     }
 
     private var emptyState: some View {
