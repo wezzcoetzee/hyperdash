@@ -106,7 +106,7 @@ struct PortfolioChartCard: View {
                 AreaMark(
                     x: .value("Time", p.date),
                     yStart: .value("Floor", frame.areaFloor),
-                    yEnd: .value("Value", p.value)
+                    yEnd: .value("Value", frame.clamped(p.value))
                 )
                 .interpolationMethod(.linear)
                 .foregroundStyle(
@@ -116,7 +116,7 @@ struct PortfolioChartCard: View {
                     )
                 )
 
-                LineMark(x: .value("Time", p.date), y: .value("Value", p.value))
+                LineMark(x: .value("Time", p.date), y: .value("Value", frame.clamped(p.value)))
                     .interpolationMethod(.linear)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     .foregroundStyle(lineColor)
@@ -133,9 +133,9 @@ struct PortfolioChartCard: View {
                 RuleMark(x: .value("Time", selected.date))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .foregroundStyle(Color.secondary.opacity(0.35))
-                marker(at: selected, diameter: 9)
+                marker(at: selected, diameter: 9, in: frame)
             } else if let last = frame.points.last {
-                marker(at: last, diameter: 7)
+                marker(at: last, diameter: 7, in: frame)
             }
         }
         .chartYScale(domain: frame.yDomain)
@@ -193,11 +193,12 @@ struct PortfolioChartCard: View {
     /// A dot ringed in the card's own background so it stays readable where the
     /// line doubles back under it.
     @ChartContentBuilder
-    private func marker(at point: PortfolioPoint, diameter: CGFloat) -> some ChartContent {
-        PointMark(x: .value("Time", point.date), y: .value("Value", point.value))
+    private func marker(at point: PortfolioPoint, diameter: CGFloat, in frame: Frame) -> some ChartContent {
+        let y = frame.clamped(point.value)
+        PointMark(x: .value("Time", point.date), y: .value("Value", y))
             .symbolSize((diameter + 4) * (diameter + 4))
             .foregroundStyle(Color(.secondarySystemGroupedBackground))
-        PointMark(x: .value("Time", point.date), y: .value("Value", point.value))
+        PointMark(x: .value("Time", point.date), y: .value("Value", y))
             .symbolSize(diameter * diameter)
             .foregroundStyle(lineColor)
     }
@@ -300,6 +301,13 @@ extension PortfolioChartCard {
             // hanging below it; account value fills from the floor.
             self.areaFloor = kind == .pnl ? 0 : yDomain.lowerBound
             self.change = Self.change(points, kind: kind)
+        }
+
+        /// Marks plot clamped values: the domain deliberately trims outliers, and
+        /// a point drawn outside it would otherwise be sliced flat by the plot's
+        /// clip. Riding the edge reads as "off the chart" instead of as a glitch.
+        func clamped(_ value: Double) -> Double {
+            min(max(value, yDomain.lowerBound), yDomain.upperBound)
         }
 
         func nearestPoint(to date: Date) -> PortfolioPoint? {
