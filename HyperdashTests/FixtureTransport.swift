@@ -4,6 +4,9 @@ import Foundation
 /// In-memory adapter for the transport seam. Answers `/info` requests by the
 /// "type" field of their body and `/exchange` requests with one canned
 /// response.
+///
+/// DEX-scoped requests are keyed "<type>:<dex>" and fall back to the bare type,
+/// so a fixture set that ignores HIP-3 answers every DEX the same way.
 struct FixtureTransport: HTTPTransport {
     var infoFixtures: [String: String]
     var exchangeFixture: String = #"{"status":"ok","response":{"type":"default"}}"#
@@ -15,7 +18,8 @@ struct FixtureTransport: HTTPTransport {
         } else if let body = request.httpBody,
                   let parsed = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                   let type = parsed["type"] as? String,
-                  let fixture = infoFixtures[type] {
+                  let fixture = (parsed["dex"] as? String).flatMap({ infoFixtures["\(type):\($0)"] })
+                      ?? infoFixtures[type] {
             json = fixture
         } else {
             json = "{}"
@@ -75,6 +79,34 @@ enum Fixtures {
       {"name": "hyperdash", "address": "0x00000000000000000000000000000000000000aa", "validUntil": 4102444800000},
       {"name": "other",     "address": "0x00000000000000000000000000000000000000bb", "validUntil": 1000000000000}
     ]
+    """#
+
+    /// The core perp dex is the leading null; "xyz" is a builder-deployed dex.
+    static let perpDexs = #"""
+    [
+      null,
+      {"name": "xyz", "fullName": "xyz equities", "deployer": "0xdead"}
+    ]
+    """#
+
+    /// An AAPL long on the "xyz" dex, with its own margin summary.
+    static let xyzPerps = #"""
+    {
+      "marginSummary": {"accountValue": "500", "totalNtlPos": "2000", "totalRawUsd": "0", "totalMarginUsed": "200"},
+      "crossMarginSummary": {"accountValue": "500", "totalNtlPos": "2000", "totalRawUsd": "0", "totalMarginUsed": "200"},
+      "crossMaintenanceMarginUsed": "50",
+      "withdrawable": "300",
+      "assetPositions": [
+        {"type": "oneWay", "position": {
+          "coin": "AAPL", "szi": "10", "entryPx": "190", "positionValue": "2000",
+          "unrealizedPnl": "100", "returnOnEquity": "0.05", "liquidationPx": "150",
+          "marginUsed": "200", "maxLeverage": 10,
+          "leverage": {"type": "cross", "value": 4},
+          "cumFunding": {"allTime": "0", "sinceOpen": "0", "sinceChange": "0"}
+        }}
+      ],
+      "time": 0
+    }
     """#
 
     static let longETHPosition = #"""

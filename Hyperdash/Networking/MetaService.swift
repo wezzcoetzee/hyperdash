@@ -16,6 +16,7 @@ actor MetaService {
     private let client: HyperliquidClient
     private var perp: PerpMeta?
     private var spot: SpotMeta?
+    private var builderDexes: [String]?
 
     init(client: HyperliquidClient) {
         self.client = client
@@ -27,6 +28,21 @@ actor MetaService {
         let universe: [Pair]
         struct Token: Decodable { let name: String; let szDecimals: Int; let index: Int }
         struct Pair: Decodable { let name: String; let tokens: [Int]; let index: Int }
+    }
+
+    /// Names of the builder-deployed (HIP-3) perp DEXs, excluding the core perp
+    /// DEX — it is the leading `null` in the `perpDexs` response and is
+    /// addressed by the empty dex string everywhere else.
+    ///
+    /// A node that doesn't serve `perpDexs` means "core DEX only" rather than a
+    /// failed snapshot, so an unusable response caches as an empty list.
+    func builderDexNames() async -> [String] {
+        if let builderDexes { return builderDexes }
+        struct Dex: Decodable { let name: String }
+        let raw = (try? await client.info(["type": "perpDexs"], as: [Dex?].self)) ?? []
+        let names = raw.compactMap { $0?.name }.filter { !$0.isEmpty }
+        builderDexes = names
+        return names
     }
 
     private func perpMeta() async throws -> PerpMeta {

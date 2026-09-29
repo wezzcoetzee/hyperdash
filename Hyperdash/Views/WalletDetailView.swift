@@ -10,6 +10,8 @@ struct WalletDetailView: View {
     @State private var tradeContext: TradeContext?
     @State private var priceAlertCoin: AlertCoin?
     @State private var editingAgentKey = false
+    @State private var renaming = false
+    @State private var draftName = ""
 
     private struct AlertCoin: Identifiable { let coin: String; var id: String { coin } }
 
@@ -35,11 +37,15 @@ struct WalletDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(wallet.name)
+        .navigationTitle(currentWallet.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button("Rename", systemImage: "pencil") {
+                        draftName = currentWallet.name
+                        renaming = true
+                    }
                     Picker("Wallet icon", selection: iconSelection) {
                         ForEach(WalletIcon.allCases) { icon in
                             Label(icon.label, systemImage: icon.rawValue).tag(icon)
@@ -48,8 +54,14 @@ struct WalletDetailView: View {
                 } label: {
                     Image(systemName: currentWallet.icon.rawValue)
                 }
-                .accessibilityLabel("Choose wallet icon")
+                .accessibilityLabel("Edit wallet")
             }
+        }
+        .alert("Rename Wallet", isPresented: $renaming) {
+            TextField("Name", text: $draftName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save", action: saveName)
+                .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .refreshable { await model.load(session: settings.session) }
         .task(id: settings.network) { await model.load(session: settings.session) }
@@ -86,6 +98,14 @@ struct WalletDetailView: View {
         )
     }
 
+    private func saveName() {
+        let name = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        var updated = currentWallet
+        updated.name = name
+        store.update(updated)
+    }
+
     @ViewBuilder
     private func content(_ snapshot: WalletSnapshot) -> some View {
         Section {
@@ -94,7 +114,7 @@ struct WalletDetailView: View {
                 .listRowBackground(Color.clear)
         }
 
-        if !snapshot.perps.openPositions.isEmpty {
+        if !snapshot.openPositions.isEmpty {
             Section {
                 ShortLongRatioCard(exposure: snapshot.sideExposure)
             }
@@ -111,11 +131,13 @@ struct WalletDetailView: View {
                 .listRowBackground(Color.clear)
         }
 
-        let openPositions = snapshot.perps.openPositions
-        if canTrade && (!openPositions.isEmpty || !snapshot.openOrders.isEmpty) {
+        // Trading and price alerts both resolve coins against the core DEX's
+        // asset ids, so builder-DEX positions are read-only here.
+        let corePositions = snapshot.openPositions.filter(\.isCore).map(\.position)
+        if canTrade && (!corePositions.isEmpty || !snapshot.openOrders.isEmpty) {
             Section {
                 Button(role: .destructive) {
-                    tradeContext = .closeAll(positions: openPositions, orders: snapshot.openOrders)
+                    tradeContext = .closeAll(positions: corePositions, orders: snapshot.openOrders)
                 } label: {
                     Text("Close all positions & orders")
                         .font(.body.weight(.semibold))
@@ -126,30 +148,35 @@ struct WalletDetailView: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 .listRowBackground(Color.clear)
             } footer: {
-                Text("Markets out every open position and cancels every resting order.")
+                Text(corePositions.count < snapshot.openPositions.count
+                     ? "Markets out every Hyperliquid position and cancels every resting order. Positions on other DEXs are not included."
+                     : "Markets out every open position and cancels every resting order.")
             }
         }
 
-        if !snapshot.perps.openPositions.isEmpty {
+        if !snapshot.openPositions.isEmpty {
             Section("Open Positions") {
-                ForEach(snapshot.perps.openPositions, id: \.coin) { position in
+                ForEach(snapshot.openPositions) { entry in
                     PositionRow(
-                        position: position,
-                        markPrice: snapshot.mark(for: position.coin)
+                        position: entry.position,
+                        dex: entry.isCore ? nil : entry.dex,
+                        markPrice: snapshot.mark(for: entry)
                     )
                     .swipeActions(edge: .trailing) {
-                        if canTrade {
+                        if canTrade && entry.isCore {
                             Button {
-                                tradeContext = .closePosition(position)
+                                tradeContext = .closePosition(entry.position)
                             } label: { Label("Close", systemImage: "xmark.circle") }
                             .tint(.red)
                         }
                     }
                     .swipeActions(edge: .leading) {
-                        Button {
-                            priceAlertCoin = AlertCoin(coin: position.coin)
-                        } label: { Label("Alert", systemImage: "bell") }
-                        .tint(.indigo)
+                        if entry.isCore {
+                            Button {
+                                priceAlertCoin = AlertCoin(coin: entry.position.coin)
+                            } label: { Label("Alert", systemImage: "bell") }
+                            .tint(.indigo)
+                        }
                     }
                 }
             }

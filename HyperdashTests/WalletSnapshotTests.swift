@@ -3,7 +3,8 @@ import XCTest
 
 final class WalletSnapshotTests: XCTestCase {
 
-    private func makeSession(allMids: String, userAbstraction: String? = nil) -> HyperliquidSession {
+    private func makeSession(allMids: String, userAbstraction: String? = nil,
+                             extraFixtures: [String: String] = [:]) -> HyperliquidSession {
         var fixtures = [
             "clearinghouseState": Fixtures.flatPerps,
             "spotClearinghouseState": Fixtures.spotWithPURR,
@@ -12,7 +13,20 @@ final class WalletSnapshotTests: XCTestCase {
             "spotMeta": Fixtures.spotMeta
         ]
         fixtures["userAbstraction"] = userAbstraction
+        fixtures.merge(extraFixtures) { _, new in new }
         return HyperliquidSession(network: .testnet, transport: FixtureTransport(infoFixtures: fixtures))
+    }
+
+    /// A wallet holding an equity position on the "xyz" HIP-3 dex. Its mids and
+    /// clearinghouse state are dex-scoped; the core dex sees none of it.
+    private func makeHIP3Session(userAbstraction: String? = nil) -> HyperliquidSession {
+        makeSession(allMids: #"{"ETH": "2000.0", "@1": "0.5"}"#,
+                    userAbstraction: userAbstraction,
+                    extraFixtures: [
+                        "perpDexs": Fixtures.perpDexs,
+                        "clearinghouseState:xyz": Fixtures.xyzPerps,
+                        "allMids:xyz": #"{"AAPL": "200.0"}"#
+                    ])
     }
 
     /// Spot mids live under "@<pair index>" in allMids, not under the coin
@@ -77,12 +91,64 @@ final class WalletSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.spotUSDValue, 100.0)
     }
 
+    /// Positions on a builder-deployed dex live in their own clearinghouse, so
+    /// without a dex-scoped request they never reach the wallet screen at all.
+    func testBuilderDexPositionsAppearWithTheirOwnMark() async throws {
+        let snapshot = try await makeHIP3Session().info.snapshot(address: "0xabc")
+
+        let aapl = try XCTUnwrap(snapshot.openPositions.first { $0.position.coin == "AAPL" })
+        XCTAssertEqual(aapl.dex, "xyz")
+        XCTAssertFalse(aapl.isCore)
+        XCTAssertEqual(snapshot.mark(for: aapl), 200.0)
+        XCTAssertEqual(snapshot.totalUnrealizedPnl, 100.0)
+        XCTAssertEqual(snapshot.sideExposure.total, 2000.0)
+        XCTAssertEqual(snapshot.sideExposure.long.count, 1)
+    }
+
+    /// Under unified account the spot balance already carries the collateral
+    /// backing every dex, so a builder dex's margin summary must not be added on.
+    func testUnifiedAccountIgnoresBuilderDexAccountValue() async throws {
+        let session = makeHIP3Session(userAbstraction: #""unifiedAccount""#)
+        let snapshot = try await session.info.snapshot(address: "0xabc")
+
+        XCTAssertEqual(snapshot.perpsAccountValue, 1000.0)
+        XCTAssertEqual(snapshot.totalAccountValue, 105.0)
+        XCTAssertEqual(snapshot.openPositions.count, 1)
+    }
+
+    /// A standard account does keep a separate balance per clearinghouse, so
+    /// there the builder dex's equity is a real addend.
+    func testStandardAccountSumsBuilderDexEquityAndMargin() async throws {
+        let snapshot = try await makeHIP3Session().info.snapshot(address: "0xabc")
+
+        XCTAssertEqual(snapshot.abstraction, .standard)
+        XCTAssertEqual(snapshot.perpsAccountValue, 1500.0)
+        XCTAssertEqual(snapshot.totalAccountValue, 1605.0)
+        XCTAssertEqual(snapshot.totalMarginUsed, 200.0)
+        XCTAssertEqual(snapshot.maintenanceMarginUsed, 50.0)
+    }
+
+    /// A node that doesn't serve `perpDexs` leaves the core-dex snapshot intact.
+    func testMissingPerpDexsLeavesSnapshotUnchanged() async throws {
+        let session = makeSession(allMids: #"{"ETH": "2000.0", "@1": "0.5"}"#)
+        let snapshot = try await session.info.snapshot(address: "0xabc")
+
+        XCTAssertTrue(snapshot.builderPerps.isEmpty)
+        XCTAssertEqual(snapshot.totalAccountValue, 1105.0)
+    }
+
+    private func corePosition(coin: String) throws -> DexPosition {
+        let json = Fixtures.longETHPosition.replacingOccurrences(of: #""coin": "ETH""#,
+                                                                with: #""coin": "\#(coin)""#)
+        return DexPosition(dex: "", position: try JSONDecoder().decode(Position.self, from: Data(json.utf8)))
+    }
+
     func testPerpMarkIsKeyedByCoin() async throws {
         let session = makeSession(allMids: #"{"ETH": "2000.0", "@1": "0.5"}"#)
         let snapshot = try await session.info.snapshot(address: "0xabc")
 
-        XCTAssertEqual(snapshot.mark(for: "ETH"), 2000.0)
-        XCTAssertNil(snapshot.mark(for: "DOGE"))
+        XCTAssertEqual(snapshot.mark(for: try corePosition(coin: "ETH")), 2000.0)
+        XCTAssertNil(snapshot.mark(for: try corePosition(coin: "DOGE")))
     }
 
     func testAccountLeverageUsesDisplayedBalanceAndOpenPositionExposure() throws {

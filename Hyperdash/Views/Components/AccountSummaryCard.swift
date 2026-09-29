@@ -46,13 +46,13 @@ struct AccountSummaryCard: View {
             // The risk row is genuinely conditional on holding positions, so the
             // placeholder leaves it out rather than reserving space that may
             // never fill.
-            if let snapshot, !snapshot.perps.openPositions.isEmpty {
+            if let snapshot, !snapshot.openPositions.isEmpty {
                 Divider()
                 SummaryMetricsRow(metrics: [
                     .init("Account Leverage", Format.leverage(snapshot.accountLeverage),
                           tint: leverageTint(snapshot.accountLeverage)),
-                    .init("Margin Used", Format.usd(snapshot.perps.totalMarginUsed)),
-                    .init("Maint. Margin", Format.usd(snapshot.perps.maintenanceMarginUsed))
+                    .init("Margin Used", Format.usd(snapshot.totalMarginUsed)),
+                    .init("Maint. Margin", Format.usd(snapshot.maintenanceMarginUsed))
                 ])
             }
         }
@@ -68,7 +68,7 @@ struct AccountSummaryCard: View {
     private var perpsMetric: SummaryMetric {
         guard let snapshot else { return .init("Perps Equity", Self.metricPlaceholder) }
         guard snapshot.valuesFromSpotAlone else {
-            return .init("Perps Equity", Format.usd(snapshot.perps.accountValue))
+            return .init("Perps Equity", Format.usd(snapshot.perpsAccountValue))
         }
         let pnl = snapshot.totalUnrealizedPnl
         return .init("Unrealized PnL", Format.signedUSD(pnl),

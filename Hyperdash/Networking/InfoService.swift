@@ -1,20 +1,41 @@
 import Foundation
 
+/// An open perp position together with the DEX whose clearinghouse reported it.
+/// `dex` is the empty string for the core Hyperliquid perp DEX and the builder's
+/// name (e.g. "xyz") for a HIP-3 DEX — the same string those info requests take.
+struct DexPosition: Identifiable {
+    let dex: String
+    let position: Position
+
+    var id: String { "\(dex):\(position.coin)" }
+
+    /// Core-DEX positions are the only ones the trade desk can act on: asset ids
+    /// are DEX-scoped, and `MetaService` resolves them against the core `meta`.
+    var isCore: Bool { dex.isEmpty }
+}
+
 /// Read-model for a wallet screen. The only code that knows how `allMids` is
 /// keyed: perp marks live under the coin name, spot mids under "@<pair index>".
-/// Every USD valuation question is answered here; views render, never price.
+/// Mids are fetched per DEX and stored that way, because a coin name is only
+/// unique within one DEX. Every USD valuation question is answered here; views
+/// render, never price.
 struct WalletSnapshot {
     let perps: PerpsState
+    /// Clearinghouse state per builder-deployed DEX, keyed by DEX name. Only
+    /// DEXs where this wallet actually holds a position are present.
+    let builderPerps: [String: PerpsState]
     let spot: SpotState
     let openOrders: [OpenOrder]
     let abstraction: AccountAbstraction
-    private let mids: [String: Double]
+    private let mids: [String: [String: Double]]
     private let spotMidKeys: [String: String]
 
-    init(perps: PerpsState, spot: SpotState, openOrders: [OpenOrder],
+    init(perps: PerpsState, builderPerps: [String: PerpsState] = [:],
+         spot: SpotState, openOrders: [OpenOrder],
          abstraction: AccountAbstraction = .standard,
-         mids: [String: Double], spotMidKeys: [String: String]) {
+         mids: [String: [String: Double]], spotMidKeys: [String: String]) {
         self.perps = perps
+        self.builderPerps = builderPerps
         self.spot = spot
         self.openOrders = openOrders
         self.abstraction = abstraction
@@ -22,12 +43,42 @@ struct WalletSnapshot {
         self.spotMidKeys = spotMidKeys
     }
 
+    /// Every open position the wallet holds, core DEX first, then builder DEXs
+    /// in name order so the list doesn't reshuffle between refreshes.
+    var openPositions: [DexPosition] {
+        let core = perps.openPositions.map { DexPosition(dex: "", position: $0) }
+        let builders = builderPerps.keys.sorted().flatMap { dex in
+            builderPerps[dex]!.openPositions.map { DexPosition(dex: dex, position: $0) }
+        }
+        return core + builders
+    }
+
     /// Under unified account and portfolio margin the spot clearinghouse already
     /// holds the perp collateral, so `spotUSDValue` is the whole account and
     /// adding perps equity would double-count it. Only a standard account keeps
     /// the two balances apart and sums them.
     var totalAccountValue: Double {
-        valuesFromSpotAlone ? spotUSDValue : perps.accountValue + spotUSDValue
+        valuesFromSpotAlone ? spotUSDValue : perpsAccountValue + spotUSDValue
+    }
+
+    /// Perp equity across every DEX. Only a standard account keeps a separate
+    /// balance per clearinghouse, so only there do the builder DEXs' margin
+    /// summaries add anything: under unified account and portfolio margin each
+    /// one restates a slice of the one spot balance, and summing double-counts.
+    var perpsAccountValue: Double {
+        guard abstraction == .standard else { return perps.accountValue }
+        return builderPerps.values.reduce(perps.accountValue) { $0 + $1.accountValue }
+    }
+
+    /// Margin committed to open positions across every DEX. Unlike account
+    /// value this sums in every mode — it is the total of each position's own
+    /// margin, not a restatement of the collateral backing them.
+    var totalMarginUsed: Double {
+        builderPerps.values.reduce(perps.totalMarginUsed) { $0 + $1.totalMarginUsed }
+    }
+
+    var maintenanceMarginUsed: Double {
+        builderPerps.values.reduce(perps.maintenanceMarginUsed) { $0 + $1.maintenanceMarginUsed }
     }
 
     /// Whether this wallet's totals come from the spot side alone. A unified
@@ -54,7 +105,7 @@ struct WalletSnapshot {
     /// summed, matching the reference `computeAccountValue` heuristic.
     var accountBalanceUSDC: Double {
         guard !valuesFromSpotAlone else { return spotUSDValue }
-        let perp = perps.accountValue
+        let perp = perpsAccountValue
         let spotUsdc = spotUSDC
         guard spotUsdc > 0 else { return perp }
         let larger = max(perp, spotUsdc)
@@ -71,16 +122,16 @@ struct WalletSnapshot {
         return sideExposure.total / balance
     }
 
-    /// Sum of unrealized PnL across all open perp positions.
+    /// Sum of unrealized PnL across all open perp positions, every DEX included.
     var totalUnrealizedPnl: Double {
-        perps.openPositions.reduce(0) { $0 + $1.unrealizedPnlValue }
+        openPositions.reduce(0) { $0 + $1.position.unrealizedPnlValue }
     }
 
     /// Open-position notional exposure split by side, for the short/long ratio bar.
     var sideExposure: SideExposure {
         var long = SideExposure.Side()
         var short = SideExposure.Side()
-        for position in perps.openPositions {
+        for position in openPositions.map(\.position) {
             if position.isLong {
                 long.notional += position.notionalValue
                 long.count += 1
@@ -92,13 +143,16 @@ struct WalletSnapshot {
         return SideExposure(long: long, short: short)
     }
 
-    /// Mark price for a perp coin.
-    func mark(for coin: String) -> Double? { mids[coin] }
+    /// Mark price for an open position, read from its own DEX's mids.
+    func mark(for position: DexPosition) -> Double? {
+        mids[position.dex]?[position.position.coin]
+    }
 
     /// USD value of a spot balance, or nil when no current price is known.
+    /// Spot mids are only served alongside the core DEX.
     func usdValue(of balance: SpotBalance) -> Double? {
         if balance.isUSDC { return balance.totalValue }
-        guard let key = spotMidKeys[balance.coin], let mid = mids[key], mid > 0 else {
+        guard let key = spotMidKeys[balance.coin], let mid = mids[""]?[key], mid > 0 else {
             return nil
         }
         return balance.totalValue * mid
@@ -160,8 +214,12 @@ struct InfoService {
     let client: HyperliquidClient
     let meta: MetaService
 
-    func allMids() async throws -> [String: Double] {
-        let raw = try await client.info(["type": "allMids"], as: [String: String].self)
+    /// Mids for one perp DEX. The empty dex string is the core DEX, and is the
+    /// only one whose response also carries spot mids.
+    func allMids(dex: String = "") async throws -> [String: Double] {
+        var body: [String: Any] = ["type": "allMids"]
+        if !dex.isEmpty { body["dex"] = dex }
+        let raw = try await client.info(body, as: [String: String].self)
         return raw.mapValues { $0.hlDouble }
     }
 
@@ -187,12 +245,54 @@ struct InfoService {
                                 as: AccountAbstraction.self)) ?? .standard
     }
 
+    /// Clearinghouse state on every builder-deployed DEX where this wallet holds
+    /// a position, keyed by DEX name. A DEX that fails or answers with nothing
+    /// open is dropped rather than failing the whole snapshot — the core DEX and
+    /// the spot balance are the parts a wallet screen can't render without.
+    private func builderStates(address: String) async -> [String: PerpsState] {
+        let names = await meta.builderDexNames()
+        guard !names.isEmpty else { return [:] }
+
+        return await withTaskGroup(of: (String, PerpsState?).self) { group in
+            for dex in names {
+                group.addTask {
+                    let state = try? await client.info(
+                        ["type": "clearinghouseState", "user": address, "dex": dex],
+                        as: PerpsState.self
+                    )
+                    return (dex, state)
+                }
+            }
+            var states: [String: PerpsState] = [:]
+            for await (dex, state) in group {
+                if let state, !state.openPositions.isEmpty { states[dex] = state }
+            }
+            return states
+        }
+    }
+
+    /// Mids for each named DEX, keyed by DEX name. A DEX whose mids can't be
+    /// fetched simply leaves its positions without a mark price.
+    private func builderMids(for dexes: [String]) async -> [String: [String: Double]] {
+        await withTaskGroup(of: (String, [String: Double]?).self) { group in
+            for dex in dexes {
+                group.addTask { (dex, try? await allMids(dex: dex)) }
+            }
+            var mids: [String: [String: Double]] = [:]
+            for await (dex, dexMids) in group {
+                if let dexMids { mids[dex] = dexMids }
+            }
+            return mids
+        }
+    }
+
     func snapshot(address: String) async throws -> WalletSnapshot {
         async let perps = client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
         async let spot = client.info(["type": "spotClearinghouseState", "user": address], as: SpotState.self)
         async let orders = client.info(["type": "frontendOpenOrders", "user": address], as: [OpenOrder].self)
-        async let mids = allMids()
+        async let coreMids = allMids()
         async let mode = abstraction(address: address)
+        async let builders = builderStates(address: address)
 
         let spotState = try await spot
         var spotMidKeys: [String: String] = [:]
@@ -202,8 +302,14 @@ struct InfoService {
             }
         }
 
+        // Mids are only worth fetching for DEXs that turned out to hold something.
+        let builderPerps = await builders
+        var mids = await builderMids(for: Array(builderPerps.keys))
+        mids[""] = try await coreMids
+
         return try await WalletSnapshot(
-            perps: perps, spot: spotState, openOrders: orders, abstraction: mode,
+            perps: perps, builderPerps: builderPerps,
+            spot: spotState, openOrders: orders, abstraction: mode,
             mids: mids, spotMidKeys: spotMidKeys
         )
     }

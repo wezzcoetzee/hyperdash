@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PositionRow: View {
     let position: Position
+    /// Builder-deployed DEX this position lives on, or nil for the core perp DEX.
+    var dex: String? = nil
     let markPrice: Double?
 
     private var liqDistance: Double? {
@@ -13,6 +15,7 @@ struct PositionRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 Text(position.coin).font(.headline)
+                if let dex { DexTag(dex: dex) }
                 DirectionTag(isLong: position.isLong)
                 Text(Format.leverage(Double(position.leverage.value)))
                     .font(.caption.weight(.semibold))
@@ -72,6 +75,21 @@ struct PositionRow: View {
             Text(label).foregroundStyle(.secondary)
             Text(value).fontWeight(.medium).monospacedDigit()
         }
+    }
+}
+
+/// Marks a position as living on a builder-deployed DEX rather than Hyperliquid's
+/// own perp DEX, where the same coin name may mean a different market.
+struct DexTag: View {
+    let dex: String
+    var body: some View {
+        Text(dex.uppercased())
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.secondary.opacity(Theme.badgeFillOpacity))
+            .foregroundStyle(.secondary)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel("On \(dex) DEX")
     }
 }
 
