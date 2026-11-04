@@ -47,6 +47,9 @@ final class AppSettings: ObservableObject {
     @Published var appearance: AppAppearance {
         didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
     }
+    @Published var walletSort: WalletSort {
+        didSet { defaults.set(walletSort.rawValue, forKey: Keys.walletSort) }
+    }
 
     private let defaults: UserDefaults
 
@@ -55,6 +58,7 @@ final class AppSettings: ObservableObject {
         static let biometricLock = "settings.biometricLock"
         static let iCloudSync = "settings.iCloudSync"
         static let appearance = "settings.appearance"
+        static let walletSort = "settings.walletSort"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -67,5 +71,6 @@ final class AppSettings: ObservableObject {
         self.iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
         let appearanceRaw = defaults.string(forKey: Keys.appearance) ?? AppAppearance.system.rawValue
         self.appearance = AppAppearance(rawValue: appearanceRaw) ?? .system
+        self.walletSort = defaults.string(forKey: Keys.walletSort).flatMap(WalletSort.init(rawValue:)) ?? .custom
     }
 }

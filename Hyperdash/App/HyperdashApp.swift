@@ -6,6 +6,7 @@ struct HyperdashApp: App {
     @StateObject private var settings: AppSettings
     @StateObject private var alerts: AlertStore
     @StateObject private var expiryStore = AgentKeyExpiryStore()
+    @StateObject private var walletData = WalletDataStore()
     @StateObject private var lock = AppLock()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -32,6 +33,7 @@ struct HyperdashApp: App {
                 .environmentObject(settings)
                 .environmentObject(alerts)
                 .environmentObject(expiryStore)
+                .environmentObject(walletData)
                 .environmentObject(lock)
                 .preferredColorScheme(settings.appearance.colorScheme)
                 .onChange(of: scenePhase) { _, phase in
@@ -41,6 +43,23 @@ struct HyperdashApp: App {
                 .onChange(of: settings.iCloudSyncEnabled) { _, enabled in
                     walletStore.setiCloudSyncEnabled(enabled)
                 }
+                .task(id: autoRefreshKey) { await autoRefresh() }
+        }
+    }
+
+    /// Restarts the refresh loop when the app activates, the network switches,
+    /// or wallets are added or removed. Sorted so reordering doesn't restart it.
+    private var autoRefreshKey: String {
+        "\(scenePhase)-\(settings.network.rawValue)-\(walletStore.wallets.map(\.id.uuidString).sorted().joined())"
+    }
+
+    /// Refreshes every wallet now and every 30s after, only while the scene is
+    /// active. Leaving the foreground changes the key, which cancels the loop.
+    private func autoRefresh() async {
+        guard scenePhase == .active else { return }
+        while !Task.isCancelled {
+            await walletData.load(wallets: walletStore.wallets, session: settings.session)
+            try? await Task.sleep(for: .seconds(30))
         }
     }
 

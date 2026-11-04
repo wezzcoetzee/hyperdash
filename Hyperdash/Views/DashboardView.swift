@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
+    @EnvironmentObject private var walletData: WalletDataStore
     @StateObject private var model = DashboardViewModel()
 
     var body: some View {
@@ -12,7 +13,7 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if store.wallets.isEmpty {
                         emptyState
-                    } else if case .failed(let message) = model.state, !model.hasLoaded {
+                    } else if case .failed(let message) = walletData.state, !walletData.hasData {
                         errorState(message)
                     } else {
                         stats
@@ -31,24 +32,30 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                await model.load(wallets: store.wallets, session: settings.session)
+                await walletData.load(wallets: store.wallets, session: settings.session)
                 await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                           keyProvider: store.agentKey)
             }
+            // Wallet data itself is fetched (and auto-refreshed) app-wide; see HyperdashApp.
             .task(id: reloadKey) {
-                await model.load(wallets: store.wallets, session: settings.session)
                 await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                           keyProvider: store.agentKey)
+            }
+            .onReceive(walletData.$data) { data in
+                model.update(wallets: store.wallets, data: data)
+            }
+            .onChange(of: store.wallets) { _, wallets in
+                model.update(wallets: wallets, data: walletData.data)
             }
         }
     }
 
-    /// Reload when the network changes or wallets are added/removed.
+    /// Refresh agent-key expiry when the network changes or wallets are added/removed.
     private var reloadKey: String {
         "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).joined())"
     }
 
-    private var loading: Bool { model.state == .loading }
+    private var loading: Bool { walletData.state == .loading }
 
     @ViewBuilder
     private var stats: some View {
@@ -64,6 +71,7 @@ struct DashboardView: View {
         let totals = model.totals
         DashboardSummaryCard(totals: totals)
             .redacted(reason: loading ? .placeholder : [])
+        UpdatedLabel(date: walletData.updatedAt)
 
         if model.topWinner != nil || model.topLoser != nil {
             VStack(alignment: .leading, spacing: 12) {
@@ -168,7 +176,7 @@ struct DashboardView: View {
                 .font(.headline)
             Text(message).font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Retry") { Task { await model.load(wallets: store.wallets, session: settings.session) } }
+            Button("Retry") { Task { await walletData.load(wallets: store.wallets, session: settings.session) } }
                 .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
