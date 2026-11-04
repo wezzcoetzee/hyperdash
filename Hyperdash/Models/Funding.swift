@@ -31,8 +31,14 @@ struct FundingSummary: Equatable {
         let net: Double
     }
 
+    static let windowDays = 7
     static let topCoinCount = 5
     static let otherLabel = "Other"
+
+    /// Start of the window the summary covers; fetch history from here.
+    static func windowStart(now: Date = Date()) -> Date {
+        now.addingTimeInterval(-Double(windowDays) * 24 * 3600)
+    }
 
     let net24h: Double
     let net7d: Double

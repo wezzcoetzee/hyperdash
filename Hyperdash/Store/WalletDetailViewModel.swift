@@ -14,11 +14,19 @@ final class WalletDetailViewModel: ObservableObject {
     @Published private(set) var snapshot: WalletSnapshot?
     @Published private(set) var portfolio: PortfolioResponse?
     @Published private(set) var fetchedAt: Date?
+    @Published private(set) var funding = FundingState.loading
     @Published var chartPeriod = AppSettings.chartPeriod {
         didSet { AppSettings.chartPeriod = chartPeriod }
     }
 
+    enum FundingState: Equatable {
+        case loading
+        case loaded(FundingSummary?)
+        case failed
+    }
+
     let wallet: Wallet
+    private var fundingNetwork: HyperliquidNetwork?
 
     init(wallet: Wallet) {
         self.wallet = wallet
@@ -30,6 +38,30 @@ final class WalletDetailViewModel: ObservableObject {
 
     func pnlChart(_ period: PortfolioPeriod) -> [PortfolioPoint] {
         portfolio?.pnlSeries(period) ?? []
+    }
+
+    /// Snapshot and funding together; funding is its own request so a slow
+    /// history never holds up the rest of the screen.
+    func refresh(session: HyperliquidSession, store: WalletDataStore) async {
+        async let funding: Void = loadFunding(session: session)
+        await load(session: session, store: store)
+        await funding
+    }
+
+    func loadFunding(session: HyperliquidSession) async {
+        let network = session.network
+        // Keep showing the old numbers on pull-to-refresh, but never across networks.
+        if fundingNetwork != network { funding = .loading }
+        fundingNetwork = network
+        do {
+            let payments = try await session.info.funding(
+                address: wallet.address, since: FundingSummary.windowStart())
+            guard fundingNetwork == network, !Task.isCancelled else { return }
+            funding = .loaded(FundingSummary(payments: payments))
+        } catch {
+            guard fundingNetwork == network, !Task.isCancelled else { return }
+            funding = .failed
+        }
     }
 
     /// Shows whatever the shared cache already holds for this wallet, then

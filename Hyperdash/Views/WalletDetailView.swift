@@ -64,8 +64,8 @@ struct WalletDetailView: View {
             Button("Save", action: saveName)
                 .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .refreshable { await model.load(session: settings.session, store: walletData) }
-        .task(id: settings.network) { await model.load(session: settings.session, store: walletData) }
+        .refreshable { await model.refresh(session: settings.session, store: walletData) }
+        .task(id: settings.network) { await model.refresh(session: settings.session, store: walletData) }
         .task(id: settings.network) {
             await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                       keyProvider: store.agentKey)
@@ -134,7 +134,9 @@ struct WalletDetailView: View {
                 .listRowBackground(Color.clear)
         }
 
-        FundingSummarySection(address: wallet.address, session: settings.session)
+        FundingSummarySection(state: model.funding) {
+            Task { await model.loadFunding(session: settings.session) }
+        }
 
         // Trading and price alerts both resolve coins against the core DEX's
         // asset ids, so builder-DEX positions are read-only here.

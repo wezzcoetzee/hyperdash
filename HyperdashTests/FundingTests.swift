@@ -44,3 +44,32 @@ final class FundingTests: XCTestCase {
         XCTAssertEqual(byCoin?.last, .init(coin: "Other", net: 3))
     }
 }
+
+/// Serves a full first page, then a short second page, recording each startTime.
+private final class PagedFundingTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var starts: [Int] = []
+    var startTimes: [Int] { lock.withLock { starts } }
+
+    func post(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
+        let start = body?["startTime"] as? Int ?? 0
+        let first = lock.withLock { starts.append(start); return starts.count == 1 }
+        let times = first ? Array(0..<InfoService.fundingPageSize).map { 1_000 + $0 } : [9_000]
+        let rows = times.map {
+            #"{"time": \#($0), "delta": {"type": "funding", "coin": "ETH", "usdc": "1"}}"#
+        }
+        let http = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (Data("[\(rows.joined(separator: ","))]".utf8), http)
+    }
+}
+
+extension FundingTests {
+    func testFundingPagesPastTheFiveHundredEntryCap() async throws {
+        let transport = PagedFundingTransport()
+        let session = HyperliquidSession(network: .testnet, transport: transport)
+        let payments = try await session.info.funding(address: "0xabc", since: .distantPast)
+        XCTAssertEqual(payments.count, InfoService.fundingPageSize + 1)
+        XCTAssertEqual(transport.startTimes.last, 1_000 + InfoService.fundingPageSize)
+    }
+}
