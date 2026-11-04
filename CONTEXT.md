@@ -19,3 +19,4 @@ Terms used in code, docs, and conversation. One meaning each; don't drift.
 - **App lock** — the policy gating the UI behind Face ID (`AppLock`): unlocks biometrically, re-locks whenever the app leaves the foreground.
 - **Funding** — perp funding paid or received by a Wallet (`userFunding`), summarised as net 24h, net 7d and a per-coin 7d breakdown (`FundingSummary`). Negative means paid.
 - **Position group** — open positions across every Wallet that share a coin, side and DEX (`PositionGroup`), with total size, combined uPnL and the nearest liquidation distance.
+- **Privacy mode** — one switch (`AppSettings.privacyMode`) that redacts every `.privacySensitive()` figure via `.redacted(reason: .privacy)` at the root. Holding the wallet peek reveals values temporarily.

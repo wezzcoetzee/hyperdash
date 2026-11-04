@@ -12,12 +12,14 @@ struct SpotBalanceRow: View {
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .privacySensitive()
             }
             Spacer()
             if let usdValue {
                 Text(Format.usd(usdValue))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
+                    .privacySensitive()
             }
         }
         .padding(.vertical, 2)
@@ -43,6 +45,7 @@ struct OpenOrderRow: View {
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .privacySensitive()
             }
             Spacer()
         }

@@ -32,10 +32,11 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Require Face ID / passcode", isOn: $settings.biometricLockEnabled)
+                    Toggle("Hide balances", isOn: $settings.privacyMode)
                 } header: {
                     Text("Security")
                 } footer: {
-                    Text("Locks the app on launch. Trades always require authentication regardless of this setting.")
+                    Text("Locks the app on launch. Trades always require authentication regardless of this setting. Hidden balances can also be toggled by tapping the dashboard total, and revealed on the Wallets tab by holding the eye button.")
                 }
 
                 Section {

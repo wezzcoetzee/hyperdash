@@ -15,6 +15,7 @@ struct PortfolioChartCard: View {
 
     /// What the user is scrubbing: a reading on the line, or a bar's delta.
     @State private var selected: PortfolioPoint?
+    @Environment(\.redactionReasons) private var redactionReasons
 
     private var style: PnLChartStyle { kind == .pnl ? pnlStyle : .line }
 
@@ -26,7 +27,14 @@ struct PortfolioChartCard: View {
         VStack(alignment: .leading, spacing: 12) {
             header(frame, unit: unit)
 
-            if frame.points.count < 2 {
+            // A redacted chart still draws its line, so privacy mode swaps in a blank plot.
+            if redactionReasons.contains(.privacy) {
+                RoundedRectangle(cornerRadius: Theme.surfaceRadius)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Self.plotHeight)
+                    .accessibilityHidden(true)
+            } else if frame.points.count < 2 {
                 Text("Not enough history yet.")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: Self.plotHeight)
@@ -69,6 +77,7 @@ struct PortfolioChartCard: View {
                     .monospacedDigit()
                     .foregroundStyle(kind == .pnl ? pnlHeadlineColor(value) : Color.primary)
                     .contentTransition(.numericText())
+                    .privacySensitive()
             }
 
             if let selected {
@@ -76,7 +85,7 @@ struct PortfolioChartCard: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             } else if let change = frame.change {
-                changeLabel(change)
+                changeLabel(change).privacySensitive()
             }
         }
     }

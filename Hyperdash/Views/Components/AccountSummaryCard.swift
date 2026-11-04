@@ -33,6 +33,7 @@ struct AccountSummaryCard: View {
                     .monospacedDigit()
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
+                    .privacySensitive()
             }
 
             Divider()

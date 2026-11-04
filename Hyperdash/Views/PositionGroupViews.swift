@@ -54,11 +54,13 @@ struct PositionGroupRow: View {
                 Text(Format.signedUSD(group.unrealizedPnl))
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(.directionText(isPositive: group.unrealizedPnl >= 0))
+                    .privacySensitive()
             }
             HStack {
                 Text(summary)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .privacySensitive()
                 Spacer(minLength: 8)
                 if let liq = group.nearestLiquidationPct {
                     Text("liq \(Format.number(liq, fractionDigits: 1))%")
@@ -135,10 +137,12 @@ struct PositionGroupDetailView: View {
                 Text(Format.signedUSD(pnl))
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(.directionText(isPositive: pnl >= 0))
+                    .privacySensitive()
             }
             HStack {
                 Text(Format.number(holding.position.absoluteSize, fractionDigits: 4))
                     .monospacedDigit().foregroundStyle(.secondary)
+                    .privacySensitive()
                 Spacer(minLength: 8)
                 if let liq = holding.liquidationPct {
                     Text("liq \(Format.number(liq, fractionDigits: 1))%")

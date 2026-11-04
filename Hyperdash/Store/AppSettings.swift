@@ -51,6 +51,11 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(walletSort.rawValue, forKey: Keys.walletSort) }
     }
 
+    /// Redacts every `.privacySensitive()` figure; applied once at the root (`MainTabView`).
+    @Published var privacyMode: Bool {
+        didSet { defaults.set(privacyMode, forKey: Keys.privacyMode) }
+    }
+
     private let defaults: UserDefaults
 
     /// Chart choices are read by view models and cards that have no settings
@@ -71,6 +76,7 @@ final class AppSettings: ObservableObject {
         static let iCloudSync = "settings.iCloudSync"
         static let appearance = "settings.appearance"
         static let walletSort = "settings.walletSort"
+        static let privacyMode = "settings.privacyMode"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -83,6 +89,7 @@ final class AppSettings: ObservableObject {
         self.iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
         let appearanceRaw = defaults.string(forKey: Keys.appearance) ?? AppAppearance.system.rawValue
         self.appearance = AppAppearance(rawValue: appearanceRaw) ?? .system
+        self.privacyMode = defaults.bool(forKey: Keys.privacyMode)
         self.walletSort = defaults.string(forKey: Keys.walletSort).flatMap(WalletSort.init(rawValue:)) ?? .custom
     }
 }

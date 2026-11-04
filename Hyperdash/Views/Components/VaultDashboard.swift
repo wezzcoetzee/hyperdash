@@ -4,6 +4,7 @@ import SwiftUI
 /// SF Rounded figure, with the rest of the portfolio totals as a quiet
 /// supporting row beneath it.
 struct DashboardSummaryCard: View {
+    @EnvironmentObject private var settings: AppSettings
     let totals: DashboardViewModel.Totals
 
     var body: some View {
@@ -17,7 +18,14 @@ struct DashboardSummaryCard: View {
                     .monospacedDigit()
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
+                    .privacySensitive()
             }
+            .contentShape(Rectangle())
+            .onTapGesture { settings.privacyMode.toggle() }
+            .sensoryFeedback(.impact(weight: .light), trigger: settings.privacyMode)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(settings.privacyMode ? "Shows balances" : "Hides balances")
 
             Divider()
 
@@ -74,6 +82,7 @@ struct SummaryMetricsRow: View {
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(metric.tint)
+                .privacySensitive()
         }
     }
 }
@@ -120,6 +129,7 @@ struct WalletPnLRow: View {
                     .foregroundStyle(.secondary)
             }
             .lineLimit(1)
+            .privacySensitive()
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.tertiary)
@@ -165,6 +175,7 @@ struct SpotHoldingsCard: View {
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .lineLimit(1)
+                .privacySensitive()
         }
         .accessibilityElement(children: .combine)
     }
@@ -228,6 +239,7 @@ struct ShortLongRatioCard: View {
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(.directionText(isPositive: isLong))
+                    .privacySensitive()
             }
             HStack {
                 Text("\(side.count) open").font(.caption2).foregroundStyle(.secondary)

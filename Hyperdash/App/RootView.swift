@@ -20,6 +20,8 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
+    @EnvironmentObject private var settings: AppSettings
+
     var body: some View {
         TabView {
             DashboardView()
@@ -29,6 +31,8 @@ struct MainTabView: View {
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }
+        // The one privacy switch: only views marked `.privacySensitive()` react to it.
+        .redacted(reason: settings.privacyMode ? .privacy : [])
     }
 }
 

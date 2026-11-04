@@ -32,6 +32,7 @@ struct PositionRow: View {
                         .monospacedDigit()
                         .foregroundStyle(.directionText(isPositive: position.returnOnEquityValue >= 0))
                 }
+                .privacySensitive()
             }
 
             fieldGroup([
@@ -62,7 +63,7 @@ struct PositionRow: View {
                 ForEach(fields, id: \.0) { pair in
                     HStack(spacing: 6) {
                         Text(pair.0).foregroundStyle(.secondary)
-                        Text(pair.1).fontWeight(.medium).monospacedDigit()
+                        Text(pair.1).fontWeight(.medium).monospacedDigit().privacySensitive()
                     }
                 }
             }
@@ -73,7 +74,7 @@ struct PositionRow: View {
     private func field(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label).foregroundStyle(.secondary)
-            Text(value).fontWeight(.medium).monospacedDigit()
+            Text(value).fontWeight(.medium).monospacedDigit().privacySensitive()
         }
     }
 }
