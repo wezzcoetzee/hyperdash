@@ -53,7 +53,19 @@ final class AppSettings: ObservableObject {
 
     private let defaults: UserDefaults
 
+    /// Chart choices are read by view models and cards that have no settings
+    /// instance, so they live in `UserDefaults.standard` behind static accessors.
+    static var chartPeriod: PortfolioPeriod {
+        get { PortfolioPeriod(rawValue: UserDefaults.standard.string(forKey: Keys.chartPeriod) ?? "") ?? .week }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Keys.chartPeriod) }
+    }
+
+    /// Key for `@AppStorage` of `PnLChartStyle`.
+    static let pnlChartStyleKey = Keys.pnlChartStyle
+
     private enum Keys {
+        static let chartPeriod = "settings.chartPeriod"
+        static let pnlChartStyle = "settings.pnlChartStyle"
         static let network = "settings.network"
         static let biometricLock = "settings.biometricLock"
         static let iCloudSync = "settings.iCloudSync"

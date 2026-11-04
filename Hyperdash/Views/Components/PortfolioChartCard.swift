@@ -1,6 +1,8 @@
 import SwiftUI
 import Charts
 
+/// A portfolio series as a Stocks-style card: a headline that follows the
+/// finger, a quiet plot, and a text range row. PnL can also be drawn as bars.
 struct PortfolioChartCard: View {
     let title: String
     @Binding var period: PortfolioPeriod
@@ -9,72 +11,78 @@ struct PortfolioChartCard: View {
 
     enum Kind { case accountValue, pnl }
 
-    /// The point the user is currently scrubbing to, if any.
+    @AppStorage(AppSettings.pnlChartStyleKey) private var pnlStyle: PnLChartStyle = .line
+
+    /// What the user is scrubbing: a reading on the line, or a bar's delta.
     @State private var selected: PortfolioPoint?
 
-    private var lineColor: Color {
-        switch kind {
-        case .accountValue: return .brandMint
-        case .pnl:
-            let last = points.last?.value ?? 0
-            return last == 0 ? .secondary : .directionText(isPositive: last >= 0)
-        }
-    }
+    private var style: PnLChartStyle { kind == .pnl ? pnlStyle : .line }
 
     var body: some View {
         let frame = Frame(points: points, kind: kind)
+        let unit = PnLBuckets.unit(for: period, points: frame.points)
+        let bars = style == .bars ? PnLBuckets.bars(from: frame.points, unit: unit) : []
 
         VStack(alignment: .leading, spacing: 12) {
-            header(frame)
-
-            Picker("Period", selection: $period) {
-                ForEach(PortfolioPeriod.allCases) { p in Text(p.label).tag(p) }
-            }
-            .pickerStyle(.segmented)
+            header(frame, unit: unit)
 
             if frame.points.count < 2 {
                 Text("Not enough history yet.")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: Self.plotHeight)
+            } else if style == .bars {
+                barChart(frame, bars: bars, unit: unit)
             } else {
-                chart(frame)
+                lineChart(frame)
             }
+
+            periodPicker
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground),
                     in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
         .onChange(of: period) { _, _ in selected = nil }
+        .onChange(of: pnlStyle) { _, _ in selected = nil }
     }
 
     // MARK: - Header
 
-    /// Title and the headline figure, with the window's change sitting under the
-    /// title the way Stocks does — a period picker with no delta makes the user
-    /// do the subtraction themselves.
-    private func header(_ frame: Frame) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+    /// Colour of the window as a whole: up, down, or flat.
+    private func windowColor(_ frame: Frame) -> Color {
+        guard let change = frame.change?.absolute, change != 0 else { return .secondary }
+        return .directionText(isPositive: change > 0)
+    }
+
+    private func header(_ frame: Frame, unit: Calendar.Component) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
                 Text(title.uppercased())
                     .font(.caption2.weight(.semibold)).tracking(0.5)
                     .foregroundStyle(.secondary)
-                if let selected {
-                    Text(selected.date, format: scrubDateFormat)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .transition(.opacity)
-                } else if let change = frame.change {
-                    changeLabel(change)
-                }
+                Spacer()
+                if kind == .pnl { styleToggle }
             }
-            Spacer()
+
             if let value = selected?.value ?? frame.points.last?.value {
                 Text(kind == .pnl ? Format.signedUSD(value) : Format.usd(value))
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .font(.system(.title, design: .rounded).weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(kind == .pnl ? lineColor : .primary)
+                    .foregroundStyle(kind == .pnl ? pnlHeadlineColor(value) : Color.primary)
                     .contentTransition(.numericText())
             }
+
+            if let selected {
+                Text(selected.date, format: scrubDateFormat(unit))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } else if let change = frame.change {
+                changeLabel(change)
+            }
         }
+    }
+
+    private func pnlHeadlineColor(_ value: Double) -> Color {
+        value == 0 ? .secondary : .directionText(isPositive: value > 0)
     }
 
     private func changeLabel(_ change: Frame.Change) -> some View {
@@ -93,114 +101,194 @@ struct PortfolioChartCard: View {
         .foregroundStyle(change.absolute == 0
                          ? Color.secondary
                          : Color.directionText(isPositive: change.absolute > 0))
-        .transition(.opacity)
     }
 
-    // MARK: - Chart
+    private var styleToggle: some View {
+        HStack(spacing: 0) {
+            ForEach(PnLChartStyle.allCases, id: \.self) { option in
+                Button { pnlStyle = option } label: {
+                    Image(systemName: option.symbol)
+                        .imageScale(.small)
+                        .foregroundStyle(option == pnlStyle ? Color.primary : Color.secondary)
+                        .frame(width: 32, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option.accessibilityLabel)
+                .accessibilityAddTraits(option == pnlStyle ? .isSelected : [])
+            }
+        }
+        .sensoryFeedback(.selection, trigger: pnlStyle)
+    }
+
+    // MARK: - Range picker
+
+    private var periodPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(PortfolioPeriod.allCases) { option in
+                Button { period = option } label: {
+                    Text(option.label)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(option == period ? Color.primary : Color.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .background(option == period ? Color.secondary.opacity(0.18) : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 8))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option.accessibilityLabel)
+                .accessibilityAddTraits(option == period ? .isSelected : [])
+            }
+        }
+        .sensoryFeedback(.selection, trigger: period)
+    }
+
+    // MARK: - Charts
 
     fileprivate static let plotHeight: CGFloat = 172
 
-    private func chart(_ frame: Frame) -> some View {
-        Chart {
-            ForEach(frame.points, id: \.date) { p in
-                AreaMark(
-                    x: .value("Time", p.date),
-                    yStart: .value("Floor", frame.areaFloor),
-                    yEnd: .value("Value", frame.clamped(p.value))
-                )
-                .interpolationMethod(.linear)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [lineColor.opacity(0.22), lineColor.opacity(0.0)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
+    private func lineChart(_ frame: Frame) -> some View {
+        let color = windowColor(frame)
+        let high = frame.points.max { $0.value < $1.value }
+        let low = frame.points.min { $0.value < $1.value }
 
-                LineMark(x: .value("Time", p.date), y: .value("Value", frame.clamped(p.value)))
-                    .interpolationMethod(.linear)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(lineColor)
-            }
+        return plot(
+            Chart {
+                // Where the window opened, so "up" and "down" have a reference.
+                if let open = frame.points.first?.value, frame.yDomain.contains(open) {
+                    RuleMark(y: .value("Open", open))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 4]))
+                        .foregroundStyle(Color.secondary.opacity(0.5))
+                }
 
-            // Zero baseline matters most on PnL — mark where profit turns to loss.
-            if kind == .pnl, frame.yDomain.contains(0) {
+                ForEach(frame.points, id: \.date) { p in
+                    LineMark(x: .value("Time", p.date), y: .value("Value", frame.clamped(p.value)))
+                        .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(color)
+                }
+
+                if let high, let low, high.value != low.value {
+                    extremeLabel(high, position: .top, in: frame)
+                    extremeLabel(low, position: .bottom, in: frame)
+                }
+
+                if let selected {
+                    RuleMark(x: .value("Time", selected.date))
+                        .lineStyle(StrokeStyle(lineWidth: 1))
+                        .foregroundStyle(Color.secondary.opacity(0.35))
+                    marker(at: selected, diameter: 9, color: color, in: frame)
+                } else if let last = frame.points.last {
+                    marker(at: last, diameter: 7, color: color, in: frame)
+                }
+            },
+            x: frame.xDomain, y: frame.yDomain, frame: frame
+        ) { date in frame.nearestPoint(to: date) }
+    }
+
+    private func barChart(_ frame: Frame, bars: [PnLBar], unit: Calendar.Component) -> some View {
+        let end = bars.last.flatMap { Calendar.current.date(byAdding: unit, value: 1, to: $0.date) }
+        let xDomain = (bars.first?.date ?? frame.xDomain.lowerBound)...(end ?? frame.xDomain.upperBound)
+
+        return plot(
+            Chart {
                 RuleMark(y: .value("Zero", 0))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    .foregroundStyle(Color.secondary.opacity(0.35))
-            }
-
-            if let selected {
-                RuleMark(x: .value("Time", selected.date))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .foregroundStyle(Color.secondary.opacity(0.35))
-                marker(at: selected, diameter: 9, in: frame)
-            } else if let last = frame.points.last {
-                marker(at: last, diameter: 7, in: frame)
-            }
+
+                ForEach(bars, id: \.date) { bar in
+                    BarMark(x: .value("Time", bar.date, unit: unit),
+                            y: .value("PnL", bar.delta),
+                            width: .inset(1))
+                        .cornerRadius(2)
+                        .foregroundStyle(bar.delta == 0 ? Color.secondary
+                                                        : Color.directionText(isPositive: bar.delta > 0))
+                        .opacity(selected == nil || selected?.date == bar.date ? 1 : 0.4)
+                }
+            },
+            x: xDomain, y: Frame.barDomain(bars), frame: frame
+        ) { date in
+            let bar = bars.last { $0.date <= date } ?? bars.first
+            return bar.map { PortfolioPoint(date: $0.date, value: $0.delta) }
         }
-        .chartYScale(domain: frame.yDomain)
-        .chartXScale(domain: frame.xDomain)
-        .chartPlotStyle { $0.clipped() }
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
-                AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
-                AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text(Format.abbreviatedUSD(v))
-                            .font(.caption2)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+    }
+
+    /// Shared plot chrome: no gridlines or y labels, a few quiet x labels, and
+    /// the scrub gesture. `pick` maps a touched date to the reading to select.
+    private func plot<Content: View>(
+        _ chart: Content,
+        x: ClosedRange<Date>,
+        y: ClosedRange<Double>,
+        frame: Frame,
+        pick: @escaping (Date) -> PortfolioPoint?
+    ) -> some View {
+        chart
+            .chartXScale(domain: x)
+            .chartYScale(domain: y)
+            .chartPlotStyle { $0.clipped() }
+            .chartYAxis(.hidden)
+            .chartXAxis {
+                // The label has to be built explicitly: a bare `AxisValueLabel()`
+                // ignores `.foregroundStyle` and renders in the system accent.
+                AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date, format: axisDateFormat)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
-        }
-        .chartXAxis {
-            // The label has to be built explicitly: a bare `AxisValueLabel()`
-            // ignores `.foregroundStyle` and renders in the system accent.
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                AxisValueLabel {
-                    if let date = value.as(Date.self) {
-                        Text(date, format: axisDateFormat)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { drag in
+                                    guard let plotFrame = proxy.plotFrame else { return }
+                                    let x = drag.location.x - geo[plotFrame].origin.x
+                                    guard let date: Date = proxy.value(atX: x) else { return }
+                                    selected = pick(date)
+                                }
+                                .onEnded { _ in selected = nil }
+                        )
                 }
             }
-        }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { drag in
-                                guard let plotFrame = proxy.plotFrame else { return }
-                                let x = drag.location.x - geo[plotFrame].origin.x
-                                guard let date: Date = proxy.value(atX: x) else { return }
-                                selected = frame.nearestPoint(to: date)
-                            }
-                            .onEnded { _ in selected = nil }
-                    )
+            .frame(height: Self.plotHeight)
+            .animation(.easeOut(duration: 0.15), value: selected)
+            .sensoryFeedback(.selection, trigger: selected?.date)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: "\(title) over \(period.accessibilityLabel)"))
+            .accessibilityValue(Text(verbatim: frame.accessibilitySummary(kind: kind)))
+    }
+
+    /// An invisible point that carries the high/low caption.
+    @ChartContentBuilder
+    private func extremeLabel(_ point: PortfolioPoint, position: AnnotationPosition, in frame: Frame) -> some ChartContent {
+        PointMark(x: .value("Time", point.date), y: .value("Value", frame.clamped(point.value)))
+            .symbolSize(1)
+            .foregroundStyle(.clear)
+            .annotation(position: position, spacing: 2,
+                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                Text(Format.abbreviatedUSD(point.value))
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
-        }
-        .frame(height: Self.plotHeight)
-        .animation(.easeOut(duration: 0.15), value: selected)
-        .sensoryFeedback(.selection, trigger: selected?.date)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: "\(title) over \(period.accessibilityLabel)"))
-        .accessibilityValue(Text(verbatim: frame.accessibilitySummary(kind: kind)))
     }
 
     /// A dot ringed in the card's own background so it stays readable where the
     /// line doubles back under it.
     @ChartContentBuilder
-    private func marker(at point: PortfolioPoint, diameter: CGFloat, in frame: Frame) -> some ChartContent {
+    private func marker(at point: PortfolioPoint, diameter: CGFloat, color: Color, in frame: Frame) -> some ChartContent {
         let y = frame.clamped(point.value)
         PointMark(x: .value("Time", point.date), y: .value("Value", y))
             .symbolSize((diameter + 4) * (diameter + 4))
             .foregroundStyle(Color(.secondarySystemGroupedBackground))
         PointMark(x: .value("Time", point.date), y: .value("Value", y))
             .symbolSize(diameter * diameter)
-            .foregroundStyle(lineColor)
+            .foregroundStyle(color)
     }
 
     // MARK: - Date formats
@@ -215,12 +303,36 @@ struct PortfolioChartCard: View {
         }
     }
 
-    private var scrubDateFormat: Date.FormatStyle {
+    /// Bars name the bucket they cover; the line names the instant.
+    private func scrubDateFormat(_ unit: Calendar.Component) -> Date.FormatStyle {
+        if style == .bars {
+            switch unit {
+            case .hour: return .dateTime.month(.abbreviated).day().hour()
+            case .month: return .dateTime.month(.wide).year()
+            default: return .dateTime.weekday(.abbreviated).month(.abbreviated).day()
+            }
+        }
         switch period {
         case .day: return .dateTime.hour().minute()
         case .week: return .dateTime.weekday(.abbreviated).hour().minute()
         case .month: return .dateTime.month(.abbreviated).day()
         case .allTime: return .dateTime.month(.abbreviated).day().year()
+        }
+    }
+}
+
+extension PnLChartStyle {
+    var symbol: String {
+        switch self {
+        case .line: return "chart.xyaxis.line"
+        case .bars: return "chart.bar.fill"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .line: return "Line chart"
+        case .bars: return "Bar chart"
         }
     }
 }
@@ -236,31 +348,30 @@ extension PortfolioChartCard {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title.uppercased())
-                            .font(.caption2.weight(.semibold)).tracking(0.5)
-                            .foregroundStyle(.secondary)
-                        Text("+$0,000.00 (+0.0%)")
-                            .font(.caption2.weight(.semibold))
-                            .monospacedDigit()
-                    }
-                    Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title.uppercased())
+                        .font(.caption2.weight(.semibold)).tracking(0.5)
+                        .foregroundStyle(.secondary)
                     Text("$00,000.00")
-                        .font(.system(.subheadline, design: .rounded).weight(.bold))
+                        .font(.system(.title, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                    Text("+$0,000.00 (+0.0%)")
+                        .font(.caption2.weight(.semibold))
                         .monospacedDigit()
                 }
-
-                Picker("Period", selection: .constant(PortfolioPeriod.week)) {
-                    ForEach(PortfolioPeriod.allCases) { p in Text(p.label).tag(p) }
-                }
-                .pickerStyle(.segmented)
-                .disabled(true)
 
                 RoundedRectangle(cornerRadius: Theme.surfaceRadius)
                     .fill(Color.secondary.opacity(0.12))
                     .frame(maxWidth: .infinity)
                     .frame(height: PortfolioChartCard.plotHeight)
+
+                HStack(spacing: 4) {
+                    ForEach(PortfolioPeriod.allCases) { p in
+                        Text(p.label)
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                }
             }
             .padding(12)
             .background(Color(.secondarySystemGroupedBackground),
@@ -271,6 +382,7 @@ extension PortfolioChartCard {
         }
     }
 }
+
 
 // MARK: - Plot geometry
 
@@ -288,7 +400,6 @@ extension PortfolioChartCard {
         let points: [PortfolioPoint]
         let yDomain: ClosedRange<Double>
         let xDomain: ClosedRange<Date>
-        let areaFloor: Double
         let change: Change?
 
         init(points raw: [PortfolioPoint], kind: Kind) {
@@ -297,9 +408,6 @@ extension PortfolioChartCard {
             self.points = points
             self.yDomain = yDomain
             self.xDomain = Self.xDomain(points)
-            // PnL fills away from the zero line so a losing stretch reads as
-            // hanging below it; account value fills from the floor.
-            self.areaFloor = kind == .pnl ? 0 : yDomain.lowerBound
             self.change = Self.change(points, kind: kind)
         }
 
@@ -328,6 +436,15 @@ extension PortfolioChartCard {
                 ? (absolute / first.value) * 100
                 : nil
             return Change(absolute: absolute, percent: percent)
+        }
+
+        /// Bars always grow from zero, so zero is always in range.
+        static func barDomain(_ bars: [PnLBar]) -> ClosedRange<Double> {
+            let lo = min(0, bars.map(\.delta).min() ?? 0)
+            let hi = max(0, bars.map(\.delta).max() ?? 0)
+            if lo == hi { return -1...1 }
+            let pad = (hi - lo) * 0.12
+            return (lo == 0 ? 0 : lo - pad)...(hi == 0 ? 0 : hi + pad)
         }
 
         /// Leaves a sliver of room at the trailing edge so the "now" marker sits

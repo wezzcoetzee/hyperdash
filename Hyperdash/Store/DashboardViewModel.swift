@@ -47,7 +47,9 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var topLoser: WalletPnL?
     @Published private(set) var topDollarWinner: WalletPnL?
     @Published private(set) var spotHoldings: [SpotHolding] = []
-    @Published var chartPeriod: PortfolioPeriod = .week
+    @Published var chartPeriod = AppSettings.chartPeriod {
+        didSet { AppSettings.chartPeriod = chartPeriod }
+    }
 
     var accountValueChart: [PortfolioPoint] {
         PortfolioAggregator.sum(portfolios.map { $0.accountValueSeries(chartPeriod) })
