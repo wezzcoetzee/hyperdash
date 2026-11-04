@@ -13,6 +13,9 @@ struct WalletsListView: View {
     @GestureState private var holdingPeek = false
     /// VoiceOver can't press and hold, so its action toggles the peek instead.
     @State private var peekToggled = false
+    /// Owned here so changing the sort can leave edit mode; reordering only
+    /// makes sense in the custom order.
+    @State private var editMode: EditMode = .inactive
 
     private var isPeeking: Bool { holdingPeek || peekToggled }
 
@@ -51,6 +54,8 @@ struct WalletsListView: View {
                     .accessibilityLabel("Add wallet")
                 }
             }
+            .environment(\.editMode, $editMode)
+            .onChange(of: settings.walletSort) { editMode = .inactive }
             .sensoryFeedback(.impact(weight: .light), trigger: isPeeking) { _, peeking in peeking }
             .onChange(of: isPeeking) { _, peeking in
                 guard peeking, !walletData.hasData else { return }

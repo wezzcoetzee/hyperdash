@@ -30,6 +30,15 @@ struct WalletData {
     }
 }
 
+private extension Dictionary where Key == UUID, Value == WalletData {
+    /// A full load and a single-wallet refresh can overlap; the slower, older
+    /// response must not overwrite the newer one.
+    mutating func storeIfNewer(_ fresh: WalletData, for id: UUID) {
+        if let current = self[id], current.fetchedAt > fresh.fetchedAt { return }
+        self[id] = fresh
+    }
+}
+
 /// The one cache of per-wallet snapshots and portfolios. Dashboard, the wallets
 /// tab and wallet detail all read from it, so their numbers always agree and a
 /// screen opened after another has fetched renders immediately.
@@ -77,13 +86,15 @@ final class WalletDataStore: ObservableObject {
             for await outcome in group { acc.append(outcome) }
             return acc
         }
-        guard session.network == network else { return }
+        // A cancelled load (scene went inactive, e.g. the Face ID prompt) is not
+        // a failure; the next load picks up where this one left off.
+        guard session.network == network, !Task.isCancelled else { return }
 
         var next = data
         var firstError: Error?
         for (id, outcome) in outcomes {
             switch outcome {
-            case .success(let fresh): next[id] = fresh
+            case .success(let fresh): next.storeIfNewer(fresh, for: id)
             case .failure(let error): firstError = firstError ?? error
             }
         }
@@ -101,7 +112,7 @@ final class WalletDataStore: ObservableObject {
         adopt(session.network)
         let fresh = try await Self.fetch(wallet, session: session, previous: data[wallet.id]).get()
         guard session.network == network else { return }
-        data[wallet.id] = fresh
+        data.storeIfNewer(fresh, for: wallet.id)
     }
 
     private func adopt(_ network: HyperliquidNetwork) {
