@@ -64,8 +64,8 @@ struct WalletDetailView: View {
             Button("Save", action: saveName)
                 .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .refreshable { await model.load(session: settings.session, store: walletData) }
-        .task(id: settings.network) { await model.load(session: settings.session, store: walletData) }
+        .refreshable { await model.refresh(session: settings.session, store: walletData) }
+        .task(id: settings.network) { await model.refresh(session: settings.session, store: walletData) }
         .task(id: settings.network) {
             await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                       keyProvider: store.agentKey)
@@ -132,6 +132,10 @@ struct WalletDetailView: View {
                                points: model.pnlChart(model.chartPeriod), kind: .pnl)
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 .listRowBackground(Color.clear)
+        }
+
+        FundingSummarySection(state: model.funding) {
+            Task { await model.loadFunding(session: settings.session) }
         }
 
         // Trading and price alerts both resolve coins against the core DEX's

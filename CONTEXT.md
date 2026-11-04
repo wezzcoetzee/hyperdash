@@ -17,3 +17,4 @@ Terms used in code, docs, and conversation. One meaning each; don't drift.
 - **Receipt** — the outcome of an executed trade (`TradeReceipt`), reduced to the message the result screen shows.
 - **Trade context** — which trade the user is confirming (`TradeContext`): close a perps position, cancel an open order, or sell a spot balance to USDC.
 - **App lock** — the policy gating the UI behind Face ID (`AppLock`): unlocks biometrically, re-locks whenever the app leaves the foreground.
+- **Funding** — perp funding paid or received by a Wallet (`userFunding`), summarised as net 24h, net 7d and a per-coin 7d breakdown (`FundingSummary`). Negative means paid.

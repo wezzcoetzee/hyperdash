@@ -237,6 +237,25 @@ struct InfoService {
         try await client.info(["type": "extraAgents", "user": address], as: [ExtraAgent].self)
     }
 
+    static let fundingPageSize = 500
+
+    /// Funding payments from `since` to now, across every DEX. The API returns
+    /// at most `fundingPageSize` entries, oldest first, so a full page means
+    /// there may be more: keep going from just after the last payment.
+    func funding(address: String, since: Date) async throws -> [FundingPayment] {
+        var payments: [FundingPayment] = []
+        var startMs = Int(since.timeIntervalSince1970 * 1000)
+        while true {
+            let page = try await client.info(
+                ["type": "userFunding", "user": address, "startTime": startMs],
+                as: [FundingPayment].self
+            )
+            payments += page
+            guard page.count >= Self.fundingPageSize, let last = page.last else { return payments }
+            startMs = Int(last.time.timeIntervalSince1970 * 1000) + 1
+        }
+    }
+
     /// Which balances back this address's positions. Older nodes and testnet
     /// deployments may not serve `userAbstraction` at all, so an unusable
     /// response means "standard" rather than a failed snapshot.
