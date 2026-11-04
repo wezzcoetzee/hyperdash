@@ -172,6 +172,12 @@ Sheets (Add Wallet, Trade Confirmation) use the standard iOS sheet presentation 
 - **Shadow Strategy:** None. See Elevation.
 - **Internal Padding:** Vertical rhythm at `{spacing.sm}`–`{spacing.xl}` (4–16px); rows breathe with `.padding(.vertical, 4)`.
 
+### Charts
+- **Headline:** The card's figure is set in SF Rounded and becomes the scrubbed value while a finger is down; the subline shows the window's signed change, or the scrubbed date.
+- **Line:** 2pt, coloured `Gain`/`Loss` by the window's direction (secondary when flat). No area fill, no gridlines, no y-axis labels; only the high and low are annotated, and a faint dotted rule marks the period-open value.
+- **Bars (PnL only):** Per-bucket deltas (hourly on 1D, daily otherwise, monthly for long all-time spans), diverging from zero, with rounded ends and a 2px gap. A small line/bars toggle sits in the card header.
+- **Range picker:** Plain text buttons under the plot, never a segmented control. The chosen period and PnL style persist.
+
 ### Inputs / Fields
 - **Style:** Standard iOS text fields inside grouped `Form` sections. Address and key entry uses `.body.monospaced()` so hex is legible and verifiable.
 - **Validation:** Errors surface in `Loss` red as inline `.caption`; storage/security notices use `Caution` orange.
