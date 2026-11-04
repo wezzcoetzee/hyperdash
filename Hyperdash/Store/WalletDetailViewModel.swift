@@ -14,7 +14,9 @@ final class WalletDetailViewModel: ObservableObject {
     @Published private(set) var snapshot: WalletSnapshot?
     @Published private(set) var portfolio: PortfolioResponse?
     @Published private(set) var fetchedAt: Date?
-    @Published var chartPeriod: PortfolioPeriod = .week
+    @Published var chartPeriod = AppSettings.chartPeriod {
+        didSet { AppSettings.chartPeriod = chartPeriod }
+    }
 
     let wallet: Wallet
 
