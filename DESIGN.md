@@ -178,7 +178,8 @@ Sheets (Add Wallet, Trade Confirmation) use the standard iOS sheet presentation 
 - **Focus:** System default focus treatment; no custom glow.
 
 ### Navigation
-- **Structure:** Root `TabView` with two tabs, Wallets (`wallet.bifold`) and Settings (`gearshape`). Wallet detail pushes in a navigation stack; Add Wallet and Trade Confirmation present as sheets.
+- **Structure:** Root `TabView` with three tabs: Dashboard (`chart.bar`), Wallets (`wallet.bifold`) and Settings (`gearshape`). Wallet detail pushes in a navigation stack; Add Wallet and Trade Confirmation present as sheets.
+- **Peek:** Pressing and holding the eye in the Wallets toolbar overlays every wallet's value, ranked, and hides on release. Long-pressing a single row opens the native context-menu preview.
 - **States:** System tab-bar tint (mint) for the active tab. Standard large-title navigation.
 - **Lock:** A full-screen lock gate (`lock.shield`, mint) precedes the tabs when biometric lock is on; Face ID unlock is a prominent mint button.
 
