@@ -16,6 +16,10 @@ A native SwiftUI iOS app for monitoring and trading Hyperliquid wallets.
 - **Full Xcode** (App Store) — the Command Line Tools alone cannot build iOS apps.
 - A free Apple ID is enough to sideload to your own device (7-day rebuild cycle).
   TestFlight and push notifications need the paid Apple Developer Program.
+- The widgets read wallet addresses through the App Group
+  `group.com.wcoetzee.hyperdash`. Free provisioning may refuse App Groups; if
+  signing fails, remove the group from both entitlements files (the app still
+  runs, the widgets just show no wallets).
 
 ## Build & run
 
@@ -42,7 +46,8 @@ Hyperdash/
   Security/      Keychain (KeyStore), biometrics
   Store/         ObservableObject state + view models
   Views/         SwiftUI screens and components
-HyperdashTests/  Signing self-checks
+HyperdashWidgets/ Home and lock screen widgets (compiles shared files from Hyperdash/)
+HyperdashTests/  Unit tests
 ```
 
 ## Safety

@@ -6,6 +6,15 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
+# The app and its widget extension must agree on versions to embed cleanly.
+settingGroups:
+  appTargets:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+
 packages:
   swift-secp256k1:
     url: https://github.com/21-DOT-DEV/swift-secp256k1
@@ -21,13 +30,9 @@ targets:
     sources:
       - path: Hyperdash
     settings:
+      groups: [appTargets]
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wcoetzee.hyperdash
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
-        SWIFT_VERSION: "5.9"
-        TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Hyperdash/Hyperdash.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Hyperdash/Info.plist
@@ -38,6 +43,43 @@ targets:
       - package: swift-secp256k1
         product: libsecp256k1
       - package: CryptoSwift
+      - target: HyperdashWidgets
+
+  # Home and lock screen widgets. They fetch public /info data themselves, so
+  # they compile the networking and model files they need straight from the
+  # app's sources rather than through a shared framework. Nothing that touches
+  # signing or the Keychain belongs in this list.
+  HyperdashWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HyperdashWidgets
+      - path: Hyperdash/Models/AccountAbstraction.swift
+      - path: Hyperdash/Models/DayChange.swift
+      - path: Hyperdash/Models/ExchangeResponse.swift
+      - path: Hyperdash/Models/Funding.swift
+      - path: Hyperdash/Models/Formatting.swift
+      - path: Hyperdash/Models/OpenOrder.swift
+      - path: Hyperdash/Models/PerpsState.swift
+      - path: Hyperdash/Models/Portfolio.swift
+      - path: Hyperdash/Models/PortfolioAggregator.swift
+      - path: Hyperdash/Models/PortfolioSummary.swift
+      - path: Hyperdash/Models/SpotState.swift
+      - path: Hyperdash/Networking/HTTPTransport.swift
+      - path: Hyperdash/Networking/HyperliquidClient.swift
+      - path: Hyperdash/Networking/HyperliquidEnvironment.swift
+      - path: Hyperdash/Networking/InfoService.swift
+      - path: Hyperdash/Networking/MetaService.swift
+      - path: Hyperdash/Store/SharedDefaults.swift
+      - path: Hyperdash/Views/Theme.swift
+    settings:
+      groups: [appTargets]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wcoetzee.hyperdash.widgets
+        CODE_SIGN_ENTITLEMENTS: HyperdashWidgets/HyperdashWidgets.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: HyperdashWidgets/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Hyperdash
 
   HyperdashTests:
     type: bundle.unit-test

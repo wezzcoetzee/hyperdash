@@ -36,7 +36,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Security")
                 } footer: {
-                    Text("Locks the app on launch. Trades always require authentication regardless of this setting. Hidden balances can also be toggled by tapping the dashboard total, and revealed on the Wallets tab by holding the eye button.")
+                    Text("Locks the app on launch. Trades always require authentication regardless of this setting. Hidden balances can also be toggled by tapping the dashboard total, and revealed on the Wallets tab by holding the eye button. Widgets hide them too.")
                 }
 
                 Section {
