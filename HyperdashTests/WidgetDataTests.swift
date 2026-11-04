@@ -56,10 +56,12 @@ final class WidgetDataTests: XCTestCase {
         XCTAssertTrue(WidgetFeed(addresses: ["0xaa", "0xbb"], network: .mainnet).publish(to: defaults))
     }
 
-    func testPrivacyModeReadsSharedKey() {
-        let defaults = scratchDefaults()
-        XCTAssertFalse(SharedDefaults.privacyMode(in: defaults))
-        defaults.set(true, forKey: "privacyMode")
-        XCTAssertTrue(SharedDefaults.privacyMode(in: defaults))
+    func testPrivacyModeTogglePublishesToSharedStore() {
+        let shared = scratchDefaults()
+        let settings = AppSettings(defaults: scratchDefaults(), shared: shared)
+        XCTAssertFalse(SharedDefaults.privacyMode(in: shared))
+        settings.privacyMode = true
+        XCTAssertTrue(SharedDefaults.privacyMode(in: shared))
+        XCTAssertTrue(AppSettings(defaults: scratchDefaults(), shared: shared).privacyMode)
     }
 }

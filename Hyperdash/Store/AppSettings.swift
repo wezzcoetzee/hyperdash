@@ -52,11 +52,13 @@ final class AppSettings: ObservableObject {
     }
 
     /// Redacts every `.privacySensitive()` figure; applied once at the root (`MainTabView`).
+    /// Lives in the App Group, not `defaults`, because widgets read it too.
     @Published var privacyMode: Bool {
-        didSet { defaults.set(privacyMode, forKey: Keys.privacyMode) }
+        didSet { shared.set(privacyMode, forKey: SharedDefaults.Key.privacyMode) }
     }
 
     private let defaults: UserDefaults
+    private let shared: UserDefaults
 
     /// Chart choices are read by view models and cards that have no settings
     /// instance, so they live in `UserDefaults.standard` behind static accessors.
@@ -76,11 +78,11 @@ final class AppSettings: ObservableObject {
         static let iCloudSync = "settings.iCloudSync"
         static let appearance = "settings.appearance"
         static let walletSort = "settings.walletSort"
-        static let privacyMode = "settings.privacyMode"
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, shared: UserDefaults = SharedDefaults.store) {
         self.defaults = defaults
+        self.shared = shared
         let raw = defaults.string(forKey: Keys.network) ?? HyperliquidNetwork.mainnet.rawValue
         let network = HyperliquidNetwork(rawValue: raw) ?? .mainnet
         self.network = network
@@ -89,7 +91,7 @@ final class AppSettings: ObservableObject {
         self.iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
         let appearanceRaw = defaults.string(forKey: Keys.appearance) ?? AppAppearance.system.rawValue
         self.appearance = AppAppearance(rawValue: appearanceRaw) ?? .system
-        self.privacyMode = defaults.bool(forKey: Keys.privacyMode)
+        self.privacyMode = SharedDefaults.privacyMode(in: shared)
         self.walletSort = defaults.string(forKey: Keys.walletSort).flatMap(WalletSort.init(rawValue:)) ?? .custom
     }
 }

@@ -48,6 +48,8 @@ struct HyperdashApp: App {
                 .onChange(of: widgetFeed, initial: true) { _, feed in
                     if feed.publish() { WidgetCenter.shared.reloadAllTimelines() }
                 }
+                // Widgets only re-read the flag on reload, so push it now.
+                .onChange(of: settings.privacyMode) { WidgetCenter.shared.reloadAllTimelines() }
         }
     }
 
