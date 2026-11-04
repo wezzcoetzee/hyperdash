@@ -46,6 +46,7 @@ struct WalletRow: View {
                 DayChangeText(change: data?.dayChange)
                     .font(.caption.monospaced())
             }
+            .privacySensitive()
             .redacted(reason: data == nil ? .placeholder : [])
         }
         .padding(.vertical, 4)
@@ -148,6 +149,7 @@ struct WalletPreview: View {
                 DayChangeText(change: data?.dayChange, showsAmount: true)
                     .font(.caption.monospaced())
             }
+            .privacySensitive()
             if !topPositions.isEmpty {
                 Divider()
                 ForEach(topPositions) { entry in
@@ -158,6 +160,7 @@ struct WalletPreview: View {
                         Text(Format.signedUSD(entry.position.unrealizedPnlValue))
                             .font(.subheadline.monospaced())
                             .foregroundStyle(.directionText(isPositive: entry.position.unrealizedPnlValue >= 0))
+                            .privacySensitive()
                     }
                 }
             }
