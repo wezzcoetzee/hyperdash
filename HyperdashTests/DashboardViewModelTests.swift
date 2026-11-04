@@ -46,27 +46,34 @@ final class DashboardViewModelTests: XCTestCase {
         ))
     }
 
-    func testPartialSnapshotFailureStillLoadsHealthyWallets() async {
+    /// Loads `wallets` into a fresh shared cache and derives the dashboard from it,
+    /// the same way `DashboardView` does.
+    private func load(_ wallets: [Wallet], failing: String? = nil,
+                      into existing: WalletDataStore? = nil) async -> (WalletDataStore, DashboardViewModel) {
+        let store = existing ?? WalletDataStore()
+        await store.load(wallets: wallets, session: session(failing: failing))
         let model = DashboardViewModel()
+        model.update(wallets: wallets, data: store.data)
+        return (store, model)
+    }
+
+    func testPartialSnapshotFailureStillLoadsHealthyWallets() async {
         let wallets = [
             Wallet(name: "Good", address: goodAddress),
             Wallet(name: "Broken", address: failAddress)
         ]
 
-        await model.load(wallets: wallets, session: session(failing: failAddress))
+        let (store, model) = await load(wallets, failing: failAddress)
 
-        XCTAssertEqual(model.state, .loaded)
-        XCTAssertTrue(model.hasLoaded)
+        XCTAssertEqual(store.state, .loaded)
+        XCTAssertEqual(store.data.count, 1)
         XCTAssertEqual(model.totals.walletCount, 1)
         XCTAssertEqual(model.portfolios.count, 1)
         XCTAssertGreaterThan(model.totals.balance, 0)
     }
 
     func testSurfacesTopWinnerFromPositivePnL() async {
-        let model = DashboardViewModel()
-        let wallets = [Wallet(name: "Good", address: goodAddress)]
-
-        await model.load(wallets: wallets, session: session(failing: nil))
+        let (_, model) = await load([Wallet(name: "Good", address: goodAddress)])
 
         let winner = try? XCTUnwrap(model.topWinner)
         XCTAssertEqual(winner?.name, "Good")
@@ -77,13 +84,12 @@ final class DashboardViewModelTests: XCTestCase {
     }
 
     func testMergesSpotHoldingsAcrossWallets() async {
-        let model = DashboardViewModel()
         let wallets = [
             Wallet(name: "One", address: goodAddress),
             Wallet(name: "Two", address: "0x00000000000000000000000000000000000000c3")
         ]
 
-        await model.load(wallets: wallets, session: session(failing: nil))
+        let (store, model) = await load(wallets)
 
         // Both wallets answer with the same spot fixture, so every coin appears
         // once at double the single-wallet amount.
@@ -91,50 +97,77 @@ final class DashboardViewModelTests: XCTestCase {
         let purr = model.spotHoldings.first { $0.coin == "PURR" }
         XCTAssertEqual(purr?.walletCount, 2)
 
+        // Deriving from just one wallet of the same cache halves it.
         let single = DashboardViewModel()
-        await single.load(wallets: [wallets[0]], session: session(failing: nil))
+        single.update(wallets: [wallets[0]], data: store.data)
         let singlePurr = single.spotHoldings.first { $0.coin == "PURR" }
         XCTAssertEqual(purr?.amount ?? 0, (singlePurr?.amount ?? 0) * 2, accuracy: 0.0001)
         XCTAssertEqual(purr?.usdValue ?? 0, (singlePurr?.usdValue ?? 0) * 2, accuracy: 0.0001)
     }
 
     func testSpotHoldingsSortedByValueDescending() async {
-        let model = DashboardViewModel()
-        await model.load(wallets: [Wallet(name: "One", address: goodAddress)],
-                         session: session(failing: nil))
+        let (_, model) = await load([Wallet(name: "One", address: goodAddress)])
 
         let values = model.spotHoldings.map { $0.usdValue ?? 0 }
         XCTAssertEqual(values, values.sorted(by: >))
     }
 
     func testAllSnapshotsFailingReportsError() async {
-        let model = DashboardViewModel()
-        let wallets = [Wallet(name: "Broken", address: failAddress)]
+        let (store, model) = await load([Wallet(name: "Broken", address: failAddress)], failing: failAddress)
 
-        await model.load(wallets: wallets, session: session(failing: failAddress))
-
-        guard case .failed = model.state else {
-            return XCTFail("Expected .failed when every wallet snapshot fails, got \(model.state)")
+        guard case .failed = store.state else {
+            return XCTFail("Expected .failed when every wallet snapshot fails, got \(store.state)")
         }
-        XCTAssertFalse(model.hasLoaded)
+        XCTAssertFalse(store.hasData)
+        XCTAssertEqual(model.totals.walletCount, 0)
     }
 
     func testTransientFailureAfterGoodLoadKeepsPriorData() async {
-        let model = DashboardViewModel()
         let wallets = [Wallet(name: "Good", address: goodAddress)]
-
-        await model.load(wallets: wallets, session: session(failing: nil))
-        XCTAssertEqual(model.state, .loaded)
-        let loadedBalance = model.totals.balance
+        let (store, first) = await load(wallets)
+        XCTAssertEqual(store.state, .loaded)
+        let loadedBalance = first.totals.balance
         XCTAssertGreaterThan(loadedBalance, 0)
 
-        await model.load(wallets: wallets, session: session(failing: goodAddress))
+        let (_, model) = await load(wallets, failing: goodAddress, into: store)
 
-        guard case .failed = model.state else {
+        guard case .failed = store.state else {
             return XCTFail("Expected .failed after a transient reload failure")
         }
-        XCTAssertTrue(model.hasLoaded)
+        XCTAssertTrue(store.hasData)
         XCTAssertEqual(model.totals.balance, loadedBalance)
         XCTAssertEqual(model.portfolios.count, 1)
+    }
+
+    func testRemovedWalletsArePrunedFromCache() async {
+        let keep = Wallet(name: "Keep", address: goodAddress)
+        let drop = Wallet(name: "Drop", address: "0x00000000000000000000000000000000000000c3")
+        let (store, _) = await load([keep, drop])
+        XCTAssertEqual(store.data.count, 2)
+
+        await store.load(wallets: [keep], session: session(failing: nil))
+
+        XCTAssertEqual(Set(store.data.keys), [keep.id])
+    }
+
+    func testSwitchingNetworkClearsCache() async {
+        let wallets = [Wallet(name: "Good", address: goodAddress)]
+        let (store, _) = await load(wallets)
+        XCTAssertTrue(store.hasData)
+
+        let mainnet = HyperliquidSession(network: .mainnet, transport: PerAddressTransport(
+            infoFixtures: [:], failingSnapshotAddress: goodAddress))
+        await store.load(wallets: wallets, session: mainnet)
+
+        XCTAssertFalse(store.hasData)
+    }
+
+    func testDayChangeUsesDayPnlWindow() async throws {
+        let wallet = Wallet(name: "Good", address: goodAddress)
+        let (store, _) = await load([wallet])
+
+        // The fixture's day pnlHistory runs 0 -> 10.
+        let change = try XCTUnwrap(store.data[wallet.id]?.dayChange)
+        XCTAssertEqual(change.amount, 10)
     }
 }

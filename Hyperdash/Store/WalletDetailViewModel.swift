@@ -13,6 +13,7 @@ final class WalletDetailViewModel: ObservableObject {
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var snapshot: WalletSnapshot?
     @Published private(set) var portfolio: PortfolioResponse?
+    @Published private(set) var fetchedAt: Date?
     @Published var chartPeriod: PortfolioPeriod = .week
 
     let wallet: Wallet
@@ -29,16 +30,28 @@ final class WalletDetailViewModel: ObservableObject {
         portfolio?.pnlSeries(period) ?? []
     }
 
-    func load(session: HyperliquidSession) async {
+    /// Shows whatever the shared cache already holds for this wallet, then
+    /// refreshes it. The cache stays the source of truth, so later refreshes
+    /// from other screens (or auto refresh) flow straight into this one.
+    func load(session: HyperliquidSession, store: WalletDataStore) async {
+        observe(store)
         if snapshot == nil { state = .loading }
         do {
-            async let snap = session.info.snapshot(address: wallet.address)
-            let port = try? await session.info.portfolio(address: wallet.address)
-            snapshot = try await snap
-            if let port { portfolio = port }
+            try await store.refresh(wallet, session: session)
             state = .loaded
         } catch {
             if snapshot == nil { state = .failed(error.userMessage) }
         }
+    }
+
+    private var isObserving = false
+
+    private func observe(_ store: WalletDataStore) {
+        guard !isObserving else { return }
+        isObserving = true
+        let entry = store.$data.map { [id = wallet.id] in $0[id] }
+        entry.map { $0?.snapshot }.assign(to: &$snapshot)
+        entry.map { $0?.portfolio }.assign(to: &$portfolio)
+        entry.map { $0?.fetchedAt }.assign(to: &$fetchedAt)
     }
 }

@@ -1,10 +1,23 @@
 import SwiftUI
+import UIKit
 
 struct WalletsListView: View {
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
+    @EnvironmentObject private var walletData: WalletDataStore
+    @EnvironmentObject private var alerts: AlertStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingAdd = false
+    /// True only while a finger is down on the eye; resets on release or cancel.
+    @GestureState private var holdingPeek = false
+    /// VoiceOver can't press and hold, so its action toggles the peek instead.
+    @State private var peekToggled = false
+    /// Owned here so changing the sort can leave edit mode; reordering only
+    /// makes sense in the custom order.
+    @State private var editMode: EditMode = .inactive
+
+    private var isPeeking: Bool { holdingPeek || peekToggled }
 
     var body: some View {
         NavigationStack {
@@ -15,21 +28,38 @@ struct WalletsListView: View {
                     list
                 }
             }
+            .overlay {
+                if isPeeking {
+                    WalletPeekOverlay(wallets: store.wallets, data: walletData.data)
+                        .transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isPeeking)
             .navigationTitle("Wallets")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingAdd = true } label: {
-                        Image(systemName: "plus")
-                    }
-                }
                 ToolbarItem(placement: .topBarLeading) {
                     NetworkBadge(network: settings.network)
                 }
-                if !store.wallets.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        EditButton()
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if !store.wallets.isEmpty {
+                        peekButton
+                        sortMenu
+                        if settings.walletSort == .custom {
+                            EditButton()
+                        }
                     }
+                    Button { showingAdd = true } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add wallet")
                 }
+            }
+            .environment(\.editMode, $editMode)
+            .onChange(of: settings.walletSort) { editMode = .inactive }
+            .sensoryFeedback(.impact(weight: .light), trigger: isPeeking) { _, peeking in peeking }
+            .onChange(of: isPeeking) { _, peeking in
+                guard peeking, !walletData.hasData else { return }
+                Task { await walletData.load(wallets: store.wallets, session: settings.session) }
             }
             .sheet(isPresented: $showingAdd) {
                 AddWalletView()
@@ -37,28 +67,77 @@ struct WalletsListView: View {
         }
     }
 
+    /// A plain view rather than a `Button`: a button claims the touch and never
+    /// reports press and release separately. A zero-distance drag does, and its
+    /// `@GestureState` resets itself if the system cancels the touch, so the
+    /// overlay can't get stuck open.
+    private var peekButton: some View {
+        Image(systemName: isPeeking ? "eye.fill" : "eye")
+            .foregroundStyle(.tint)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).updating($holdingPeek) { _, holding, _ in
+                holding = true
+            })
+            .accessibilityElement()
+            .accessibilityLabel("Peek at wallet values")
+            .accessibilityHint("Press and hold to show every wallet's value")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { peekToggled.toggle() }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort by", selection: $settings.walletSort) {
+                ForEach(WalletSort.allCases) { Text($0.label).tag($0) }
+            }
+        } label: {
+            Label("Sort", systemImage: "arrow.up.arrow.down")
+        }
+    }
+
     private var list: some View {
-        List {
-            ForEach(store.wallets) { wallet in
-                NavigationLink(value: wallet) {
-                    WalletRow(wallet: wallet, hasKey: store.hasAgentKey(wallet),
-                              expiry: expiryStore.expiries[wallet.id])
+        let ordered = settings.walletSort.sorted(store.wallets, data: walletData.data)
+        return List {
+            Section {
+                ForEach(ordered) { wallet in
+                    NavigationLink(value: wallet) {
+                        WalletRow(wallet: wallet, hasKey: store.hasAgentKey(wallet),
+                                  expiry: expiryStore.expiries[wallet.id],
+                                  data: walletData.data[wallet.id],
+                                  liquidationThresholdPct: alerts.config.liquidationThresholdPct)
+                    }
+                    .contextMenu {
+                        Button("Copy Address", systemImage: "doc.on.doc") {
+                            UIPasteboard.general.string = wallet.address
+                        }
+                    } preview: {
+                        WalletPreview(wallet: wallet, data: walletData.data[wallet.id])
+                    }
                 }
-            }
-            .onDelete { indexSet in
-                indexSet.map { store.wallets[$0] }.forEach(store.remove)
-            }
-            .onMove { source, destination in
-                store.move(fromOffsets: source, toOffset: destination)
+                .onDelete { indexSet in
+                    indexSet.map { ordered[$0] }.forEach(store.remove)
+                }
+                // Reordering only makes sense against the stored order.
+                .onMove(perform: settings.walletSort == .custom ? reorder : nil)
+            } footer: {
+                UpdatedLabel(date: walletData.updatedAt)
             }
         }
         .navigationDestination(for: Wallet.self) { wallet in
             WalletDetailView(wallet: wallet)
         }
+        .refreshable {
+            await walletData.load(wallets: store.wallets, session: settings.session)
+        }
         .task(id: refreshKey) {
             await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                       keyProvider: store.agentKey)
         }
+    }
+
+    private func reorder(_ source: IndexSet, _ destination: Int) {
+        store.move(fromOffsets: source, toOffset: destination)
     }
 
     /// Re-run agent-key expiry refresh when the network changes or wallets are added/removed.
@@ -75,43 +154,6 @@ struct WalletsListView: View {
         } actions: {
             Button("Add Wallet") { showingAdd = true }
                 .buttonStyle(.borderedProminent)
-        }
-    }
-}
-
-struct WalletRow: View {
-    let wallet: Wallet
-    let hasKey: Bool
-    var expiry: AgentKeyExpiry?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: wallet.icon.rawValue)
-                .foregroundStyle(.tint)
-                .font(.title2)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(wallet.name).font(.headline)
-                Text(wallet.shortAddress)
-                    .font(.subheadline.monospaced())
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            keyIndicator
-        }
-        .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private var keyIndicator: some View {
-        if let expiry, expiry.status() != .healthy {
-            AgentKeyBadge(expiry: expiry, compact: true)
-        } else if hasKey {
-            Image(systemName: "key.fill")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-                .accessibilityLabel("Trading enabled")
         }
     }
 }

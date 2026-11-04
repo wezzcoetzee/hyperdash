@@ -6,6 +6,7 @@ struct WalletDetailView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var expiryStore: AgentKeyExpiryStore
+    @EnvironmentObject private var walletData: WalletDataStore
     @StateObject private var model: WalletDetailViewModel
     @State private var tradeContext: TradeContext?
     @State private var priceAlertCoin: AlertCoin?
@@ -63,15 +64,15 @@ struct WalletDetailView: View {
             Button("Save", action: saveName)
                 .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .refreshable { await model.load(session: settings.session) }
-        .task(id: settings.network) { await model.load(session: settings.session) }
+        .refreshable { await model.load(session: settings.session, store: walletData) }
+        .task(id: settings.network) { await model.load(session: settings.session, store: walletData) }
         .task(id: settings.network) {
             await expiryStore.refresh(wallets: store.wallets, session: settings.session,
                                       keyProvider: store.agentKey)
         }
         .sheet(item: $tradeContext) { context in
             TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
-                Task { await model.load(session: settings.session) }
+                Task { await model.load(session: settings.session, store: walletData) }
             }
         }
         .sheet(item: $priceAlertCoin) { item in
@@ -112,6 +113,8 @@ struct WalletDetailView: View {
             AccountSummaryCard(snapshot: snapshot)
                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 .listRowBackground(Color.clear)
+        } footer: {
+            UpdatedLabel(date: model.fetchedAt)
         }
 
         if !snapshot.openPositions.isEmpty {
@@ -291,7 +294,7 @@ struct WalletDetailView: View {
                 .font(.headline)
             Text(message).font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Retry") { Task { await model.load(session: settings.session) } }
+            Button("Retry") { Task { await model.load(session: settings.session, store: walletData) } }
                 .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
