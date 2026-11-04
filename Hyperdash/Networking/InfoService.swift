@@ -237,6 +237,14 @@ struct InfoService {
         try await client.info(["type": "extraAgents", "user": address], as: [ExtraAgent].self)
     }
 
+    /// Funding payments from `since` to now, across every DEX.
+    func funding(address: String, since: Date) async throws -> [FundingPayment] {
+        try await client.info(
+            ["type": "userFunding", "user": address, "startTime": Int(since.timeIntervalSince1970 * 1000)],
+            as: [FundingPayment].self
+        )
+    }
+
     /// Which balances back this address's positions. Older nodes and testnet
     /// deployments may not serve `userAbstraction` at all, so an unusable
     /// response means "standard" rather than a failed snapshot.
