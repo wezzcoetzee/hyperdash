@@ -26,6 +26,9 @@ struct DashboardView: View {
             .navigationDestination(for: Wallet.self) { wallet in
                 WalletDetailView(wallet: wallet)
             }
+            .navigationDestination(for: PositionGroupKey.self) { key in
+                PositionGroupDetailView(key: key)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NetworkBadge(network: settings.network)
@@ -102,6 +105,12 @@ struct DashboardView: View {
 
         if !model.spotHoldings.isEmpty {
             SpotHoldingsCard(holdings: model.spotHoldings)
+                .redacted(reason: loading ? .placeholder : [])
+        }
+
+        let positionGroups = PositionGroup.groups(wallets: store.wallets, data: walletData.data)
+        if !positionGroups.isEmpty {
+            PositionGroupsSection(groups: positionGroups)
                 .redacted(reason: loading ? .placeholder : [])
         }
 
