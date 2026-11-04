@@ -57,6 +57,7 @@ targets:
       - path: Hyperdash/Models/AccountAbstraction.swift
       - path: Hyperdash/Models/DayChange.swift
       - path: Hyperdash/Models/ExchangeResponse.swift
+      - path: Hyperdash/Models/Funding.swift
       - path: Hyperdash/Models/Formatting.swift
       - path: Hyperdash/Models/OpenOrder.swift
       - path: Hyperdash/Models/PerpsState.swift
