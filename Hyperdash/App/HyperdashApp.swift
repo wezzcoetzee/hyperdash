@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @main
 struct HyperdashApp: App {
@@ -44,6 +45,9 @@ struct HyperdashApp: App {
                     walletStore.setiCloudSyncEnabled(enabled)
                 }
                 .task(id: autoRefreshKey) { await autoRefresh() }
+                .onChange(of: widgetFeed, initial: true) { _, feed in
+                    if feed.publish() { WidgetCenter.shared.reloadAllTimelines() }
+                }
         }
     }
 
@@ -51,6 +55,11 @@ struct HyperdashApp: App {
     /// or wallets are added or removed. Sorted so reordering doesn't restart it.
     private var autoRefreshKey: String {
         "\(scenePhase)-\(settings.network.rawValue)-\(walletStore.wallets.map(\.id.uuidString).sorted().joined())"
+    }
+
+    /// What the widget fetches on its own, mirrored into the App Group.
+    private var widgetFeed: WidgetFeed {
+        WidgetFeed(addresses: walletStore.wallets.map(\.address), network: settings.network)
     }
 
     /// Refreshes every wallet now and every 30s after, only while the scene is
