@@ -71,11 +71,43 @@ struct DashboardView: View {
             keyWarnings(warnings)
         }
 
-        let totals = model.totals
-        DashboardSummaryCard(totals: totals)
-            .redacted(reason: loading ? .placeholder : [])
-        UpdatedLabel(date: walletData.updatedAt)
+        // Order and visibility come from Settings → Dashboard layout.
+        ForEach(settings.dashboardLayout.visible) { section in
+            self.section(section)
+        }
+    }
 
+    @ViewBuilder
+    private func section(_ section: DashboardSection) -> some View {
+        switch section {
+        case .summary:
+            DashboardSummaryCard(totals: model.totals)
+                .redacted(reason: loading ? .placeholder : [])
+            UpdatedLabel(date: walletData.updatedAt)
+        case .pnlLeaders:
+            pnlLeaders
+        case .spotHoldings:
+            if !model.spotHoldings.isEmpty {
+                SpotHoldingsCard(holdings: model.spotHoldings)
+                    .redacted(reason: loading ? .placeholder : [])
+            }
+        case .positions:
+            let positionGroups = PositionGroup.groups(wallets: store.wallets, data: walletData.data)
+            if !positionGroups.isEmpty {
+                PositionGroupsSection(groups: positionGroups)
+                    .redacted(reason: loading ? .placeholder : [])
+            }
+        case .openInterest:
+            openInterest
+        case .accountValueChart:
+            chart(title: "Account Value", points: model.accountValueChart, kind: .accountValue)
+        case .pnlChart:
+            chart(title: "PnL", points: model.pnlChart, kind: .pnl)
+        }
+    }
+
+    @ViewBuilder
+    private var pnlLeaders: some View {
         if model.topWinner != nil || model.topLoser != nil {
             VStack(alignment: .leading, spacing: 12) {
                 Text("PnL Leaders".uppercased())
@@ -102,41 +134,33 @@ struct DashboardView: View {
                         in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
             .redacted(reason: loading ? .placeholder : [])
         }
+    }
 
-        if !model.spotHoldings.isEmpty {
-            SpotHoldingsCard(holdings: model.spotHoldings)
-                .redacted(reason: loading ? .placeholder : [])
-        }
-
-        let positionGroups = PositionGroup.groups(wallets: store.wallets, data: walletData.data)
-        if !positionGroups.isEmpty {
-            PositionGroupsSection(groups: positionGroups)
-                .redacted(reason: loading ? .placeholder : [])
-        }
-
-        if totals.exposure.total > 0 {
+    @ViewBuilder
+    private var openInterest: some View {
+        let exposure = model.totals.exposure
+        if exposure.total > 0 {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Open Interest".uppercased())
                     .font(.caption2.weight(.semibold)).tracking(0.5)
                     .foregroundStyle(.secondary)
-                ShortLongRatioCard(exposure: totals.exposure)
+                ShortLongRatioCard(exposure: exposure)
             }
             .padding(12)
             .background(Color(.secondarySystemGroupedBackground),
                         in: RoundedRectangle(cornerRadius: Theme.surfaceRadius))
             .redacted(reason: loading ? .placeholder : [])
         }
+    }
 
-        // Redacting a live chart still draws its line; the placeholder holds the
-        // same footprint without pretending to have data.
+    /// Redacting a live chart still draws its line; the placeholder holds the
+    /// same footprint without pretending to have data.
+    @ViewBuilder
+    private func chart(title: String, points: [PortfolioPoint], kind: PortfolioChartCard.Kind) -> some View {
         if loading {
-            PortfolioChartCard.Placeholder(title: "Account Value")
-            PortfolioChartCard.Placeholder(title: "PnL")
+            PortfolioChartCard.Placeholder(title: title)
         } else {
-            PortfolioChartCard(title: "Account Value", period: $model.chartPeriod,
-                               points: model.accountValueChart, kind: .accountValue)
-            PortfolioChartCard(title: "PnL", period: $model.chartPeriod,
-                               points: model.pnlChart, kind: .pnl)
+            PortfolioChartCard(title: title, period: $model.chartPeriod, points: points, kind: kind)
         }
     }
 

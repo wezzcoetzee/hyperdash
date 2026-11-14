@@ -57,6 +57,14 @@ final class AppSettings: ObservableObject {
         didSet { shared.set(privacyMode, forKey: SharedDefaults.Key.privacyMode) }
     }
 
+    /// The dashboard's section order and visibility, edited in Settings.
+    @Published var dashboardLayout: DashboardLayout {
+        didSet {
+            defaults.set(dashboardLayout.order.map(\.rawValue), forKey: Keys.dashboardOrder)
+            defaults.set(dashboardLayout.hidden.map(\.rawValue), forKey: Keys.dashboardHidden)
+        }
+    }
+
     private let defaults: UserDefaults
     private let shared: UserDefaults
 
@@ -78,6 +86,8 @@ final class AppSettings: ObservableObject {
         static let iCloudSync = "settings.iCloudSync"
         static let appearance = "settings.appearance"
         static let walletSort = "settings.walletSort"
+        static let dashboardOrder = "settings.dashboardOrder"
+        static let dashboardHidden = "settings.dashboardHidden"
     }
 
     init(defaults: UserDefaults = .standard, shared: UserDefaults = SharedDefaults.store) {
@@ -93,5 +103,9 @@ final class AppSettings: ObservableObject {
         self.appearance = AppAppearance(rawValue: appearanceRaw) ?? .system
         self.privacyMode = SharedDefaults.privacyMode(in: shared)
         self.walletSort = defaults.string(forKey: Keys.walletSort).flatMap(WalletSort.init(rawValue:)) ?? .custom
+        self.dashboardLayout = DashboardLayout(
+            storedOrder: defaults.stringArray(forKey: Keys.dashboardOrder) ?? [],
+            storedHidden: defaults.stringArray(forKey: Keys.dashboardHidden) ?? []
+        )
     }
 }
