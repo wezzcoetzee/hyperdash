@@ -26,6 +26,7 @@ struct SettingsView: View {
                             Text(appearance.displayName).tag(appearance)
                         }
                     }
+                    NavigationLink("Dashboard layout") { DashboardLayoutView() }
                 } header: {
                     Text("Appearance")
                 }
