@@ -20,6 +20,13 @@ enum HyperliquidNetwork: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var webSocketURL: URL {
+        switch self {
+        case .mainnet: return URL(string: "wss://api.hyperliquid.xyz/ws")!
+        case .testnet: return URL(string: "wss://api.hyperliquid-testnet.xyz/ws")!
+        }
+    }
+
     /// Source byte used in the phantom-agent EIP-712 payload for L1 actions.
     var signatureSource: String {
         switch self {
