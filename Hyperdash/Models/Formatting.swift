@@ -15,8 +15,15 @@ enum Format {
     }
 
     static func signedUSD(_ value: Double, fractionDigits: Int = 2) -> String {
-        let sign = value >= 0 ? "+" : "-"
-        return "\(sign)$\(number(abs(value), fractionDigits: fractionDigits))"
+        signed(value) { "$\(number($0, fractionDigits: fractionDigits))" }
+    }
+
+    static func signedPrice(_ value: Double) -> String {
+        signed(value, price)
+    }
+
+    private static func signed(_ value: Double, _ format: (Double) -> String) -> String {
+        (value >= 0 ? "+" : "-") + format(abs(value))
     }
 
     static func number(_ value: Double, fractionDigits: Int = 2) -> String {

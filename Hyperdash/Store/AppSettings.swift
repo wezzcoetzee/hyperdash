@@ -78,9 +78,13 @@ final class AppSettings: ObservableObject {
     /// Key for `@AppStorage` of `PnLChartStyle`.
     static let pnlChartStyleKey = Keys.pnlChartStyle
 
+    /// Key for `@AppStorage` of `ChartStyle`, shared by every coin price chart.
+    static let coinChartStyleKey = Keys.coinChartStyle
+
     private enum Keys {
         static let chartPeriod = "settings.chartPeriod"
         static let pnlChartStyle = "settings.pnlChartStyle"
+        static let coinChartStyle = "settings.coinChartStyle"
         static let network = "settings.network"
         static let biometricLock = "settings.biometricLock"
         static let iCloudSync = "settings.iCloudSync"

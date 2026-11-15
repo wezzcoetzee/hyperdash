@@ -20,6 +20,13 @@ struct PositionProtectionView: View {
     @State private var draft = ""
     @State private var confirming: TradeContext?
     @State private var traded = false
+    @StateObject private var chart = CoinChartModel()
+    @State private var range: CandleRange = .day
+    @State private var chartAttempt = 0
+    /// Low and high of the loaded candles, kept inside the ladder's scale.
+    @State private var chartExtent: [Double] = []
+    @State private var dragging = false
+    @AppStorage(AppSettings.coinChartStyleKey) private var chartStyle: ChartStyle = .standard
 
     private let initialTakeProfit: Double?
     private let initialStopLoss: Double?
@@ -48,12 +55,17 @@ struct PositionProtectionView: View {
         NavigationStack {
             List {
                 Section {
-                    PriceLadder(
-                        scale: scale, mark: mark, entry: position.entryPrice,
-                        liquidation: position.liquidationPrice, isLong: position.isLong,
-                        takeProfit: $takeProfit, stopLoss: $stopLoss,
-                        onDragEnded: rescale
-                    )
+                    chartControls
+                    ZStack(alignment: .topLeading) {
+                        chartBackdrop
+                        PriceLadder(
+                            scale: scale, mark: mark, entry: position.entryPrice,
+                            liquidation: position.liquidationPrice, isLong: position.isLong,
+                            takeProfit: $takeProfit, stopLoss: $stopLoss,
+                            onDragStarted: { dragging = true },
+                            onDragEnded: rescale
+                        )
+                    }
                     .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 12))
                 }
 
@@ -64,6 +76,7 @@ struct PositionProtectionView: View {
                     if let warning { Text(warning).foregroundStyle(.cautionText) }
                 }
             }
+            .task(id: chartRequest) { await loadChart() }
             .navigationTitle("\(position.coin) \(position.directionLabel)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -95,6 +108,53 @@ struct PositionProtectionView: View {
             TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
                 traded = true
             }
+        }
+    }
+
+    // MARK: Price chart
+
+    private var chartRequest: CoinChartModel.Request {
+        .init(coin: position.coin, range: range, network: settings.network, attempt: chartAttempt)
+    }
+
+    /// The previous candles stay up while a new range loads. Once they land the
+    /// scale refits around them, unless a drag is in flight: that drag's end refits.
+    private func loadChart() async {
+        await chart.load(chartRequest, session: settings.session, keepingPrevious: true)
+        guard !Task.isCancelled else { return }
+        let candles = chart.candles.value ?? []
+        chartExtent = [candles.map(\.low).min(), candles.map(\.high).max()].compactMap { $0 }
+        if !dragging { refit() }
+    }
+
+    private var chartControls: some View {
+        VStack(spacing: 4) {
+            HStack {
+                ChartRangePicker(selection: $range, options: CandleRange.ladder)
+                ChartStyleToggle()
+            }
+            if case .failed = chart.candles {
+                ChartRetryRow { chartAttempt += 1 }
+            }
+        }
+    }
+
+    /// Price history drawn on the ladder's own scale, dimmed so the level lines
+    /// and handles stay the most prominent thing on the screen.
+    @ViewBuilder
+    private var chartBackdrop: some View {
+        switch chart.candles {
+        case .loading:
+            ChartPlaceholder()
+                .frame(height: PriceLadder.height)
+                .padding(.leading, PriceLadder.axisInset)
+        case .loaded(let candles) where !candles.isEmpty:
+            CoinChart(candles: candles, style: chartStyle, yDomain: scale.low...scale.high, chrome: .backdrop)
+                .frame(height: PriceLadder.height)
+                .padding(.leading, PriceLadder.axisInset)
+                .opacity(0.45)
+        default:
+            EmptyView()
         }
     }
 
@@ -178,11 +238,16 @@ struct PositionProtectionView: View {
     }
 
     private func rescale() {
-        scale = Self.scale(position: position, mark: mark, levels: [takeProfit, stopLoss])
+        dragging = false
+        refit()
     }
 
-    private static func scale(position: Position, mark: Double, levels: [Double?]) -> LadderScale {
-        LadderScale(levels: (levels + [position.entryPrice, position.liquidationPrice]).compactMap { $0 }, mark: mark)
+    private func refit() {
+        scale = Self.scale(position: position, mark: mark, levels: [takeProfit, stopLoss], extent: chartExtent)
+    }
+
+    private static func scale(position: Position, mark: Double, levels: [Double?], extent: [Double] = []) -> LadderScale {
+        LadderScale(levels: (levels + [position.entryPrice, position.liquidationPrice]).compactMap { $0 } + extent, mark: mark)
     }
 
     private func finishIfTraded() {
@@ -204,11 +269,17 @@ struct PriceLadder: View {
     let isLong: Bool
     @Binding var takeProfit: Double?
     @Binding var stopLoss: Double?
+    var onDragStarted: () -> Void = {}
     let onDragEnded: () -> Void
+    /// Counts finished drags. The haptic follows a handle being let go, not a
+    /// scale refit, which candle loads also cause.
+    @State private var drops = 0
 
     static let height: CGFloat = 320
     private static let labelWidth: CGFloat = 44
     private static let rowHeight: CGFloat = 24
+    /// Where the axis rule sits: the chart behind the ladder starts here.
+    static let axisInset: CGFloat = labelWidth + 6
 
     /// Rounds to four significant figures so a drag lands on readable prices.
     static func tidy(_ price: Double) -> Double {
@@ -224,7 +295,7 @@ struct PriceLadder: View {
             Rectangle()
                 .fill(.quaternary)
                 .frame(width: 2, height: Self.height)
-                .offset(x: Self.labelWidth + 6)
+                .offset(x: Self.axisInset)
 
             if let liquidation, liquidation > 0 {
                 line("Liq.", price: liquidation, tint: .cautionText, dashed: true)
@@ -237,7 +308,7 @@ struct PriceLadder: View {
         }
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .topLeading)
         .coordinateSpace(name: "ladder")
-        .sensoryFeedback(.impact(weight: .light), trigger: scale)
+        .sensoryFeedback(.impact(weight: .light), trigger: drops)
     }
 
     private func y(_ price: Double) -> CGFloat {
@@ -289,9 +360,13 @@ struct PriceLadder: View {
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("ladder"))
                     .onChanged { drag in
+                        onDragStarted()
                         binding.wrappedValue = clamped(scale.price(at: drag.location.y / Self.height), kind: kind)
                     }
-                    .onEnded { _ in onDragEnded() }
+                    .onEnded { _ in
+                        drops += 1
+                        onDragEnded()
+                    }
             )
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(kind == .takeProfit ? "Take profit" : "Stop loss")
