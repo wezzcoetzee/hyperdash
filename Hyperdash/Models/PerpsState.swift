@@ -27,6 +27,20 @@ struct PerpsState: Decodable {
     var openPositions: [Position] {
         assetPositions.map(\.position).filter { $0.size != 0 }
     }
+
+    /// The same state with each position revalued at its coin's mark. Margin
+    /// summaries stay as reported; the next poll replaces them.
+    func repriced(marks: [String: Double]) -> PerpsState {
+        PerpsState(
+            marginSummary: marginSummary, crossMarginSummary: crossMarginSummary,
+            crossMaintenanceMarginUsed: crossMaintenanceMarginUsed, withdrawable: withdrawable,
+            assetPositions: assetPositions.map { asset in
+                guard let mark = marks[asset.position.coin] else { return asset }
+                return AssetPosition(type: asset.type, position: asset.position.repriced(mark: mark))
+            },
+            time: time
+        )
+    }
 }
 
 struct MarginSummary: Decodable {
@@ -79,6 +93,24 @@ struct Position: Decodable {
     var liquidationPrice: Double? { liquidationPx?.hlDouble }
     var marginUsedValue: Double { marginUsed.hlDouble }
     var fundingSinceOpen: Double { cumFunding.sinceOpen.hlDouble }
+
+    /// The position revalued at a new mark. `liquidationPx` is left as reported:
+    /// it depends on account-wide margin that only a poll can refresh. ROE is a
+    /// fraction of the margin at entry (entry notional / leverage), so it
+    /// doesn't drift with the mark the way cross margin used does.
+    func repriced(mark: Double) -> Position {
+        guard let entry = entryPrice, mark > 0 else { return self }
+        let pnl = (mark - entry) * size
+        let margin = absoluteSize * entry / Double(max(leverage.value, 1))
+        return Position(
+            coin: coin, szi: szi, entryPx: entryPx,
+            positionValue: String(absoluteSize * mark),
+            unrealizedPnl: String(pnl),
+            returnOnEquity: margin > 0 ? String(pnl / margin) : returnOnEquity,
+            liquidationPx: liquidationPx, marginUsed: marginUsed,
+            maxLeverage: maxLeverage, leverage: leverage, cumFunding: cumFunding
+        )
+    }
 
     /// Percentage distance from the given mark price to the liquidation price.
     func liquidationDistancePct(markPrice: Double) -> Double? {

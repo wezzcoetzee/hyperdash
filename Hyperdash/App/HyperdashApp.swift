@@ -45,6 +45,7 @@ struct HyperdashApp: App {
                     walletStore.setiCloudSyncEnabled(enabled)
                 }
                 .task(id: autoRefreshKey) { await autoRefresh() }
+                .task(id: liveMidsKey) { await followLiveMids() }
                 .onChange(of: widgetFeed, initial: true) { _, feed in
                     if feed.publish() { WidgetCenter.shared.reloadAllTimelines() }
                 }
@@ -71,6 +72,21 @@ struct HyperdashApp: App {
         while !Task.isCancelled {
             await walletData.load(wallets: walletStore.wallets, session: settings.session)
             try? await Task.sleep(for: .seconds(30))
+        }
+    }
+
+    /// Restarts the live feed when the app activates or the network switches.
+    private var liveMidsKey: String { "\(scenePhase)-\(settings.network.rawValue)" }
+
+    /// Reprices cached wallets from the live mids feed while the scene is
+    /// active. The feed keeps only its newest update, so sleeping after each
+    /// apply caps repaints at one per second without dropping the latest prices.
+    private func followLiveMids() async {
+        guard scenePhase == .active else { return }
+        let network = settings.network
+        for await mids in MidsFeed.stream(network: network) {
+            walletData.apply(coreMids: mids, network: network)
+            try? await Task.sleep(for: .seconds(1))
         }
     }
 

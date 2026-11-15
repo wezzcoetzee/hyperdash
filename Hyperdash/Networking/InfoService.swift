@@ -150,6 +150,20 @@ struct WalletSnapshot {
         return SideExposure(long: long, short: short)
     }
 
+    /// The snapshot repriced from a live core-DEX `allMids` update: core mids
+    /// are overlaid (keys the update lacks keep their last value), and core
+    /// positions are revalued. Builder-DEX positions and mids are untouched,
+    /// since the feed doesn't carry them.
+    func repriced(coreMids: [String: Double]) -> WalletSnapshot {
+        var nextMids = mids
+        nextMids[""] = (mids[""] ?? [:]).merging(coreMids) { _, new in new }
+        return WalletSnapshot(
+            perps: perps.repriced(marks: coreMids), builderPerps: builderPerps,
+            spot: spot, openOrders: openOrders, abstraction: abstraction,
+            mids: nextMids, spotMidKeys: spotMidKeys
+        )
+    }
+
     /// Mark price for an open position, read from its own DEX's mids.
     func mark(for position: DexPosition) -> Double? {
         mids[position.dex]?[position.position.coin]

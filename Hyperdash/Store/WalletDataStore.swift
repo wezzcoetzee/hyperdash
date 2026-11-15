@@ -115,6 +115,19 @@ final class WalletDataStore: ObservableObject {
         data.storeIfNewer(fresh, for: wallet.id)
     }
 
+    /// Reprices every cached snapshot from a live core-DEX mids update. Keeps
+    /// each `fetchedAt`: the data is no fresher, only its prices are. Mids from
+    /// another network (a socket outliving a network switch) are dropped.
+    func apply(coreMids: [String: Double], network: HyperliquidNetwork) {
+        guard network == self.network else { return }
+        data = data.mapValues { current in
+            WalletData(
+                snapshot: current.snapshot.repriced(coreMids: coreMids),
+                portfolio: current.portfolio, fetchedAt: current.fetchedAt
+            )
+        }
+    }
+
     private func adopt(_ network: HyperliquidNetwork) {
         guard network != self.network else { return }
         self.network = network
