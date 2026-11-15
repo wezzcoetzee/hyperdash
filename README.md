@@ -6,8 +6,10 @@ A native SwiftUI iOS app for monitoring and trading Hyperliquid wallets.
 
 - **Monitor** any wallet by public address: total value, perp positions (leverage,
   liquidation price + distance, funding, uPnL), spot balances, open orders.
-- **Trade** with an approved agent (API) wallet key: close positions, cancel
-  orders, sell spot → USDC. Every trade is confirmed and gated by Face ID.
+- **Trade** with an approved agent (API) wallet key: open market or limit
+  positions with leverage and TP/SL, set TP/SL on a position from a price
+  ladder, close positions in full or in part, cancel orders, sell spot → USDC.
+  Every trade is confirmed and gated by Face ID.
 - **Storage**: wallet metadata in UserDefaults + iCloud key-value store; agent
   keys in the Keychain (optionally iCloud-synced).
 
@@ -61,4 +63,4 @@ HyperdashTests/  Unit tests
 
 - Phase 5: monitoring backend + APNs push for liquidation/leverage alerts,
   TestFlight distribution (requires Apple Developer Program).
-- Later: open positions, order placement, adjust leverage.
+- Later: add to a position from its ladder, isolated margin adjustment.

@@ -9,12 +9,20 @@ struct WalletDetailView: View {
     @EnvironmentObject private var walletData: WalletDataStore
     @StateObject private var model: WalletDetailViewModel
     @State private var tradeContext: TradeContext?
+    @State private var ticketCoin: TicketCoin?
+    @State private var protecting: ProtectionTarget?
     @State private var priceAlertCoin: AlertCoin?
     @State private var editingAgentKey = false
     @State private var renaming = false
     @State private var draftName = ""
 
     private struct AlertCoin: Identifiable { let coin: String; var id: String { coin } }
+    private struct TicketCoin: Identifiable { let coin: String; var id: String { coin } }
+    private struct ProtectionTarget: Identifiable {
+        let position: Position
+        let mark: Double
+        var id: String { position.coin }
+    }
 
     init(wallet: Wallet) {
         self.wallet = wallet
@@ -41,6 +49,13 @@ struct WalletDetailView: View {
         .navigationTitle(currentWallet.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if canTrade, model.snapshot != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Trade", systemImage: "plus") {
+                        ticketCoin = TicketCoin(coin: model.snapshot?.perps.openPositions.first?.coin ?? "BTC")
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Rename", systemImage: "pencil") {
@@ -71,9 +86,17 @@ struct WalletDetailView: View {
                                       keyProvider: store.agentKey)
         }
         .sheet(item: $tradeContext) { context in
-            TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
-                Task { await model.load(session: settings.session, store: walletData) }
+            TradeConfirmationView(wallet: wallet, context: context, session: settings.session, onCompleted: reload)
+        }
+        .sheet(item: $ticketCoin) { item in
+            if let snapshot = model.snapshot {
+                OrderTicketView(wallet: wallet, coin: item.coin, available: snapshot.availableToTrade,
+                                positions: snapshot.perps.openPositions, onCompleted: reload)
             }
+        }
+        .sheet(item: $protecting) { target in
+            PositionProtectionView(wallet: wallet, position: target.position, mark: target.mark,
+                                   orders: model.snapshot?.openOrders ?? [], onCompleted: reload)
         }
         .sheet(item: $priceAlertCoin) { item in
             AddPriceAlertView(coin: item.coin)
@@ -86,6 +109,10 @@ struct WalletDetailView: View {
                 }
             }
         }
+    }
+
+    private func reload() {
+        Task { await model.load(session: settings.session, store: walletData) }
     }
 
     private var iconSelection: Binding<WalletIcon> {
@@ -164,11 +191,18 @@ struct WalletDetailView: View {
         if !snapshot.openPositions.isEmpty {
             Section("Open Positions") {
                 ForEach(snapshot.openPositions) { entry in
+                    let mark = snapshot.mark(for: entry)
+                    let target = canTrade && entry.isCore
+                        ? mark.map { ProtectionTarget(position: entry.position, mark: $0) } : nil
                     PositionRow(
                         position: entry.position,
                         dex: entry.isCore ? nil : entry.dex,
-                        markPrice: snapshot.mark(for: entry)
+                        markPrice: mark
                     )
+                    // Tapping a tradable position opens its TP/SL ladder.
+                    .contentShape(Rectangle())
+                    .onTapGesture { if let target { protecting = target } }
+                    .accessibilityAction(named: "Take profit and stop loss") { if let target { protecting = target } }
                     .swipeActions(edge: .trailing) {
                         if canTrade && entry.isCore {
                             Button {

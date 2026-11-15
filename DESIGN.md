@@ -158,6 +158,7 @@ Sheets (Add Wallet, Trade Confirmation) use the standard iOS sheet presentation 
 - **Primary:** SwiftUI `.borderedProminent` tinted mint. Mint fill, `Ink` label, used for the single committing action per screen (Unlock, Confirm Trade, Add). Pressed state deepens to `Mint Pressed`.
 - **Secondary:** `.bordered` / plain, label in `.tint` mint on a neutral surface.
 - **Destructive:** Red-tinted swipe actions and buttons for Close Position and Delete Wallet. Destructive intent is always red and always requires a deliberate gesture.
+- **Side (Long / Short):** The order ticket's two final actions, `.borderedProminent` tinted `Gain` and `Loss`. The colour reports the side, and the word carries it too. Both lead to the confirmation sheet; neither sends anything.
 
 ### Badges / Pills
 - **Style:** Small `{rounded.pill}` (4px) rectangles, colored text over the same color at ~18–25% opacity fill. No border.
@@ -182,9 +183,12 @@ Sheets (Add Wallet, Trade Confirmation) use the standard iOS sheet presentation 
 - **Style:** Standard iOS text fields inside grouped `Form` sections. Address and key entry uses `.body.monospaced()` so hex is legible and verifiable.
 - **Validation:** Errors surface in `Loss` red as inline `.caption`; storage/security notices use `Caution` orange.
 - **Focus:** System default focus treatment; no custom glow.
+- **Order ticket:** Amount-first. One SF Rounded dollar figure fed by a custom 3×4 keypad, never the system keyboard. Percent chips fill a share of buying power; leverage and TP/SL are compact menus in one row. Limit mode adds a price figure, and the keypad edits whichever figure is focused (the other dims to secondary). The reason it can't be sent shows inline in `Caution`.
+- **Price ladder (TP/SL):** A vertical price axis drawn to scale, highest at the top: liquidation (`Caution`, dashed), entry (secondary, dashed), mark (primary, solid), and draggable TP (`Gain`) and SL (`Loss`) handles. A faint 10% band fills from the mark to each trigger. Handles can't cross to the wrong side of the mark. The scale refits when a drag ends, never during one. VoiceOver adjusts each handle in 0.5% steps.
+- **Partial close:** A slider in the close confirmation that snaps at 25/50/75/100% and starts at 100%.
 
 ### Navigation
-- **Structure:** Root `TabView` with three tabs: Dashboard (`chart.bar`), Wallets (`wallet.bifold`) and Settings (`gearshape`). Wallet detail pushes in a navigation stack; Add Wallet and Trade Confirmation present as sheets.
+- **Structure:** Root `TabView` with three tabs: Dashboard (`chart.bar`), Wallets (`wallet.bifold`) and Settings (`gearshape`). Wallet detail pushes in a navigation stack; Add Wallet, the order ticket (toolbar `plus`), the TP/SL ladder (tap a position) and Trade Confirmation present as sheets. The confirmation stacks over the ticket and ladder, and a completed trade closes both.
 - **Peek:** Pressing and holding the eye in the Wallets toolbar overlays every wallet's value, ranked, and hides on release. Long-pressing a single row opens the native context-menu preview.
 - **States:** System tab-bar tint (mint) for the active tab. Standard large-title navigation.
 - **Lock:** A full-screen lock gate (`lock.shield`, mint) precedes the tabs when biometric lock is on; Face ID unlock is a prominent mint button.

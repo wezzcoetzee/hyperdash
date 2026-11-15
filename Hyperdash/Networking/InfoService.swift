@@ -93,6 +93,13 @@ struct WalletSnapshot {
         spot.nonZeroBalances.reduce(0) { $0 + (usdValue(of: $1) ?? 0) }
     }
 
+    /// Collateral free to back a new perp order. Unified account and portfolio
+    /// margin draw it from spot USDC; a standard account from perps withdrawable.
+    var availableToTrade: Double {
+        guard abstraction.spotHoldsWholeAccount else { return perps.withdrawableValue }
+        return spot.balances.first(where: \.isUSDC)?.availableValue ?? 0
+    }
+
     /// USDC held in the spot wallet (already dollar-denominated).
     var spotUSDC: Double {
         spot.balances.first(where: \.isUSDC)?.totalValue ?? 0

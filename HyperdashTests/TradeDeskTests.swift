@@ -125,4 +125,105 @@ final class TradeDeskTests: XCTestCase {
             XCTAssertEqual(error.errorDescription, "Authentication cancelled.")
         }
     }
+
+    // MARK: Opening, partial close, TP/SL
+
+    private let eth = AssetInfo(assetId: 0, szDecimals: 4, isSpot: false, midKey: "ETH")
+
+    private func trigger(_ json: String) throws -> OpenOrder {
+        try JSONDecoder().decode(OpenOrder.self, from: Data(json.utf8))
+    }
+
+    func testPreparePartialCloseSendsTheFractionReduceOnly() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let plan = try await desk.prepare(.closePosition(try longETH, fraction: 0.5))
+
+        let expected = TradeActions.orderAction(
+            asset: eth, isBuy: false,
+            price: TradeActions.aggressivePrice(mark: 2000, isBuy: false),
+            size: 0.75, reduceOnly: true
+        )
+        XCTAssertEqual(plan.action.encoded(), expected.encoded())
+    }
+
+    func testPrepareOpenMarketSetsLeverageThenAttachesTriggers() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let ticket = OrderTicket(coin: "ETH", isLong: true, kind: .market, notional: 1000, leverage: 5,
+                                 takeProfitMove: 0.1, stopLossMove: 0.05)
+
+        let plan = try await desk.prepare(.openPosition(ticket))
+
+        XCTAssertEqual(plan.actions.count, 2)
+        XCTAssertEqual(plan.actions[0].encoded(),
+                       TradeActions.updateLeverageAction(assetId: 0, isCross: true, leverage: 5).encoded())
+
+        // $1,000 at a 2,000 mark is 0.5 ETH. TP at +10%, SL at -5%, both sells closing the long.
+        let expectedOrders = TradeActions.ordersAction([
+            TradeActions.orderEntry(asset: eth, isBuy: true,
+                                    price: TradeActions.aggressivePrice(mark: 2000, isBuy: true),
+                                    size: 0.5, reduceOnly: false),
+            TradeActions.orderEntry(asset: eth, isBuy: false,
+                                    price: TradeActions.aggressivePrice(mark: 2200, isBuy: false),
+                                    size: 0.5, reduceOnly: true,
+                                    kind: .trigger(triggerPrice: 2200, isTakeProfit: true)),
+            TradeActions.orderEntry(asset: eth, isBuy: false,
+                                    price: TradeActions.aggressivePrice(mark: 1900, isBuy: false),
+                                    size: 0.5, reduceOnly: true,
+                                    kind: .trigger(triggerPrice: 1900, isTakeProfit: false))
+        ], grouping: .normalTpsl)
+        XCTAssertEqual(plan.actions[1].encoded(), expectedOrders.encoded())
+    }
+
+    func testPrepareOpenLimitRestsGtcAtTheLimitPrice() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let ticket = OrderTicket(coin: "ETH", isLong: false, kind: .limit(price: 2500), notional: 500, leverage: 2)
+
+        let plan = try await desk.prepare(.openPosition(ticket))
+
+        let expected = TradeActions.ordersAction([
+            TradeActions.orderEntry(asset: eth, isBuy: false, price: 2500, size: 0.2,
+                                    reduceOnly: false, kind: .gtc)
+        ])
+        XCTAssertEqual(plan.actions[1].encoded(), expected.encoded())
+    }
+
+    func testPrepareOpenRejectsLeverageAboveTheAssetMax() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let ticket = OrderTicket(coin: "ETH", isLong: true, kind: .market, notional: 1000, leverage: 51)
+
+        do {
+            _ = try await desk.prepare(.openPosition(ticket))
+            XCTFail("Expected leverage above 50x to be rejected")
+        } catch let HyperliquidError.exchange(message) {
+            XCTAssertEqual(message, "Max leverage for ETH is 50x.")
+        }
+    }
+
+    func testPrepareProtectionPlacesNewTriggersBeforeCancellingOld() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        let old = try trigger(#"""
+        {"coin": "ETH", "side": "A", "limitPx": "1500", "sz": "1.5", "oid": 9, "timestamp": 0,
+         "orderType": "Stop Market", "reduceOnly": true, "isTrigger": true, "triggerPx": "1600"}
+        """#)
+
+        let plan = try await desk.prepare(.setProtection(try longETH, takeProfit: 2400, stopLoss: nil, replacing: [old]))
+
+        XCTAssertEqual(plan.actions.count, 2)
+        let expectedOrders = TradeActions.ordersAction([
+            TradeActions.orderEntry(asset: eth, isBuy: false,
+                                    price: TradeActions.aggressivePrice(mark: 2400, isBuy: false),
+                                    size: 1.5, reduceOnly: true,
+                                    kind: .trigger(triggerPrice: 2400, isTakeProfit: true))
+        ], grouping: .positionTpsl)
+        XCTAssertEqual(plan.actions[0].encoded(), expectedOrders.encoded())
+        XCTAssertEqual(plan.actions[1].encoded(), TradeActions.cancelsAction([(assetId: 0, oid: 9)]).encoded())
+    }
+
+    func testPrepareProtectionWithNothingToChangeThrows() async throws {
+        let desk = makeDesk(vault: StubVault(key: agentKey))
+        do {
+            _ = try await desk.prepare(.setProtection(try longETH, takeProfit: nil, stopLoss: nil, replacing: []))
+            XCTFail("Expected an empty TP/SL change to be rejected")
+        } catch HyperliquidError.exchange {}
+    }
 }

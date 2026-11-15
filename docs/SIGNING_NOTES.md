@@ -8,7 +8,7 @@ below. Rounding of price/size and msgpack field order are the classic causes of
 
 ## The scheme (what the code implements)
 
-For an L1 action (`order`, `cancel`):
+For an L1 action (`order`, `cancel`, `updateLeverage`):
 
 1. `connectionId = keccak256( msgpack(action) || nonce_be64 || vaultFlag[+addr] )`
    - `vaultFlag` = `0x00` (no vault) — Hyperdash always uses `0x00`.
@@ -35,8 +35,9 @@ For an L1 action (`order`, `cancel`):
 
 3. **Testnet dry run.** Settings → Network → Testnet. Fund a testnet account,
    approve an API wallet at app.hyperliquid.xyz (testnet), add it in Hyperdash,
-   then cancel a resting order and close a small position. Confirm the fills on
-   the Hyperliquid testnet UI.
+   then cancel a resting order and close a small position. Then open a small
+   market long with TP/SL, partially close it, and move its TP/SL on the ladder.
+   Confirm the fills and trigger orders on the Hyperliquid testnet UI.
 
 4. **Only then** switch to Mainnet.
 
