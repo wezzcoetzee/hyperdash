@@ -165,6 +165,8 @@ struct WalletDetailView: View {
             Task { await model.loadFunding(session: settings.session) }
         }
 
+        ActivitySection(wallet: wallet)
+
         // Trading and price alerts both resolve coins against the core DEX's
         // asset ids, so builder-DEX positions are read-only here.
         let corePositions = snapshot.openPositions.filter(\.isCore).map(\.position)
