@@ -178,6 +178,8 @@ Sheets (Add Wallet, Trade Confirmation) use the standard iOS sheet presentation 
 - **Line:** 2pt, coloured `Gain`/`Loss` by the window's direction (secondary when flat). No area fill, no gridlines, no y-axis labels; only the high and low are annotated, and a faint dotted rule marks the period-open value.
 - **Bars (PnL only):** Per-bucket deltas (hourly on 1D, daily otherwise, monthly for long all-time spans), diverging from zero, with rounded ends and a 2px gap. A small line/bars toggle sits in the card header.
 - **Range picker:** Plain text buttons under the plot, never a segmented control. The chosen period and PnL style persist.
+- **Coin chart:** A coin's price as candles (body plus wick, `Gain`/`Loss` by close against open) or a 2pt line of closes coloured by the range's direction, no gridlines or y labels, high and low annotated, scrubbing on touch. Candles and Line are plain text buttons beside the headline; the choice is one setting shared by every coin chart. The coin detail leads with the price as its only headline, the signed change over the range, then the chart, a 1D to 1Y range row and Funding / 1h, Open interest and 24h volume. Loading is a static grey block, never a spinner; a failure is one quiet retry row.
+- **Ladder background:** On the TP/SL ladder the coin chart is drawn bare (no axes, annotations or gestures) at 45% opacity, from the price axis to the trailing edge, on the ladder's own scale so a candle sits at the same height as its price line. Marks beyond the scale ride its edge. Level lines and handles stay the most prominent thing.
 
 ### Inputs / Fields
 - **Style:** Standard iOS text fields inside grouped `Form` sections. Address and key entry uses `.body.monospaced()` so hex is legible and verifiable.

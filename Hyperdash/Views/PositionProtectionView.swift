@@ -20,6 +20,9 @@ struct PositionProtectionView: View {
     @State private var draft = ""
     @State private var confirming: TradeContext?
     @State private var traded = false
+    @StateObject private var chart = CoinChartModel()
+    @State private var range: CandleRange = .day
+    @AppStorage(AppSettings.coinChartStyleKey) private var chartStyle: ChartStyle = .standard
 
     private let initialTakeProfit: Double?
     private let initialStopLoss: Double?
@@ -48,12 +51,16 @@ struct PositionProtectionView: View {
         NavigationStack {
             List {
                 Section {
-                    PriceLadder(
-                        scale: scale, mark: mark, entry: position.entryPrice,
-                        liquidation: position.liquidationPrice, isLong: position.isLong,
-                        takeProfit: $takeProfit, stopLoss: $stopLoss,
-                        onDragEnded: rescale
-                    )
+                    chartControls
+                    ZStack(alignment: .topLeading) {
+                        chartBackdrop
+                        PriceLadder(
+                            scale: scale, mark: mark, entry: position.entryPrice,
+                            liquidation: position.liquidationPrice, isLong: position.isLong,
+                            takeProfit: $takeProfit, stopLoss: $stopLoss,
+                            onDragEnded: rescale
+                        )
+                    }
                     .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 12))
                 }
 
@@ -64,6 +71,7 @@ struct PositionProtectionView: View {
                     if let warning { Text(warning).foregroundStyle(.cautionText) }
                 }
             }
+            .task(id: chartRequest) { await loadChart() }
             .navigationTitle("\(position.coin) \(position.directionLabel)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -95,6 +103,47 @@ struct PositionProtectionView: View {
             TradeConfirmationView(wallet: wallet, context: context, session: settings.session) {
                 traded = true
             }
+        }
+    }
+
+    // MARK: Price chart
+
+    private var chartRequest: CoinChartModel.Request {
+        .init(coin: position.coin, range: range, network: settings.network)
+    }
+
+    private func loadChart() async {
+        await chart.load(chartRequest, session: settings.session)
+    }
+
+    private var chartControls: some View {
+        VStack(spacing: 4) {
+            HStack {
+                ChartRangePicker(selection: $range, options: CandleRange.ladder)
+                ChartStyleToggle()
+            }
+            if case .failed = chart.candles {
+                ChartRetryRow { Task { await loadChart() } }
+            }
+        }
+    }
+
+    /// Price history drawn on the ladder's own scale, dimmed so the level lines
+    /// and handles stay the most prominent thing on the screen.
+    @ViewBuilder
+    private var chartBackdrop: some View {
+        switch chart.candles {
+        case .loading:
+            CoinChart.Placeholder()
+                .frame(height: PriceLadder.height)
+                .padding(.leading, PriceLadder.axisInset)
+        case .loaded(let candles) where !candles.isEmpty:
+            CoinChart(candles: candles, style: chartStyle, yDomain: scale.low...scale.high, chrome: .backdrop)
+                .frame(height: PriceLadder.height)
+                .padding(.leading, PriceLadder.axisInset)
+                .opacity(0.45)
+        default:
+            EmptyView()
         }
     }
 
@@ -209,6 +258,8 @@ struct PriceLadder: View {
     static let height: CGFloat = 320
     private static let labelWidth: CGFloat = 44
     private static let rowHeight: CGFloat = 24
+    /// Where the axis rule sits: the chart behind the ladder starts here.
+    static let axisInset: CGFloat = labelWidth + 6
 
     /// Rounds to four significant figures so a drag lands on readable prices.
     static func tidy(_ price: Double) -> Double {
@@ -224,7 +275,7 @@ struct PriceLadder: View {
             Rectangle()
                 .fill(.quaternary)
                 .frame(width: 2, height: Self.height)
-                .offset(x: Self.labelWidth + 6)
+                .offset(x: Self.axisInset)
 
             if let liquidation, liquidation > 0 {
                 line("Liq.", price: liquidation, tint: .cautionText, dashed: true)

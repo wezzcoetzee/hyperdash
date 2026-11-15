@@ -110,8 +110,10 @@ struct PositionGroupDetailView: View {
     var body: some View {
         List {
             if let group {
-                Section { PositionGroupRow(group: group) }
-                Section("Wallets") {
+                // Builder-DEX coins are named and served differently; no chart for them.
+                if group.key.dex.isEmpty { CoinMarketSection(coin: key.coin) }
+                Section("Your positions") {
+                    PositionGroupRow(group: group)
                     ForEach(group.holdings) { holding in
                         NavigationLink(value: holding.wallet) { holdingRow(holding) }
                     }
