@@ -5,6 +5,7 @@ final class DailyPnLTests: XCTestCase {
     private let calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(secondsFromGMT: 2 * 3600) ?? .gmt
+        c.firstWeekday = 2
         return c
     }()
 
@@ -59,6 +60,16 @@ final class DailyPnLTests: XCTestCase {
     func testMondayFirstLeadingBlanksForMondayStart() {
         // September 2025 starts on a Monday.
         XCTAssertEqual(ActivityMonth(fills: [], containing: localDate(9, 10), calendar: calendar).leadingBlanks, 0)
+    }
+
+    func testSundayFirstCalendarShiftsGridAndHeaders() {
+        var sunday = calendar
+        sunday.firstWeekday = 1
+        sunday.locale = Locale(identifier: "en_US")
+        let m = ActivityMonth(fills: [], containing: localDate(11, 15), calendar: sunday)
+        XCTAssertEqual(m.leadingBlanks, 6)
+        XCTAssertEqual(m.weekdayHeaders.first, "S")
+        XCTAssertEqual(m.weekdayHeaders.count, 7)
     }
 
     func testTintOpacityScalesAndClamps() {

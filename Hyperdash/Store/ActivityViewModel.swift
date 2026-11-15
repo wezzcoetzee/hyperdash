@@ -1,7 +1,8 @@
 import Foundation
 
 /// Drives the Activity screen and the wallet detail row that leads into it.
-/// Months are fetched once and cached; the cache is dropped when the network changes.
+/// Months are fetched once and cached per network, so a network switch can
+/// never serve another network's numbers.
 @MainActor
 final class ActivityViewModel: ObservableObject {
     enum MonthState: Equatable {
@@ -10,15 +11,19 @@ final class ActivityViewModel: ObservableObject {
         case failed
     }
 
+    private struct Key: Hashable {
+        let network: HyperliquidNetwork
+        let month: Date
+    }
+
     let wallet: Wallet
     let calendar: Calendar
     private let now: () -> Date
 
     @Published private(set) var month: Date
     @Published var selectedDay: Date?
-    @Published private var months: [Date: ActivityMonth] = [:]
-    @Published private var failedMonths: Set<Date> = []
-    private var cacheNetwork: HyperliquidNetwork?
+    @Published private var months: [Key: ActivityMonth] = [:]
+    @Published private var failedMonths: Set<Key> = []
 
     init(wallet: Wallet, calendar: Calendar = .current, now: @escaping () -> Date = Date.init) {
         self.wallet = wallet
@@ -35,24 +40,23 @@ final class ActivityViewModel: ObservableObject {
 
     var isCurrentMonth: Bool { month == currentMonthStart }
 
-    func state(for monthStart: Date) -> MonthState {
-        if let loaded = months[monthStart] { return .loaded(loaded) }
-        return failedMonths.contains(monthStart) ? .failed : .loading
+    func state(for monthStart: Date, network: HyperliquidNetwork) -> MonthState {
+        let key = Key(network: network, month: monthStart)
+        if let loaded = months[key] { return .loaded(loaded) }
+        return failedMonths.contains(key) ? .failed : .loading
     }
 
-    var state: MonthState { state(for: month) }
-
-    func step(by months: Int) {
-        guard let next = calendar.date(byAdding: .month, value: months, to: month),
+    func step(by delta: Int, network: HyperliquidNetwork) {
+        guard let next = calendar.date(byAdding: .month, value: delta, to: month),
               next <= currentMonthStart else { return }
         month = next
-        selectedDay = defaultSelection(in: next)
+        selectedDay = defaultSelection(in: next, network: network)
     }
 
     /// Today in the current month; otherwise the latest day with fills once they load.
-    private func defaultSelection(in monthStart: Date) -> Date? {
+    private func defaultSelection(in monthStart: Date, network: HyperliquidNetwork) -> Date? {
         if monthStart == currentMonthStart { return calendar.startOfDay(for: now()) }
-        if case .loaded(let loaded) = state(for: monthStart) { return loaded.days.keys.max() }
+        if case .loaded(let loaded) = state(for: monthStart, network: network) { return loaded.days.keys.max() }
         return nil
     }
 
@@ -60,24 +64,22 @@ final class ActivityViewModel: ObservableObject {
     /// old numbers on screen, so pull-to-refresh never blanks the calendar.
     func load(_ monthStart: Date, session: HyperliquidSession, force: Bool = false) async {
         let network = session.network
-        if cacheNetwork != network {
-            months = [:]
-            failedMonths = []
-            cacheNetwork = network
-        }
-        if months[monthStart] != nil, !force { return }
-        failedMonths.remove(monthStart)
+        let key = Key(network: network, month: monthStart)
+        if months[key] != nil, !force { return }
+        failedMonths.remove(key)
 
         let window = ActivityMonth.fetchWindowMs(containing: monthStart, calendar: calendar)
         do {
             let fills = try await session.info.fills(
                 address: wallet.address, startMs: window.start, endMs: window.end)
-            guard cacheNetwork == network, !Task.isCancelled else { return }
-            months[monthStart] = ActivityMonth(fills: fills, containing: monthStart, calendar: calendar)
-            if monthStart == month, selectedDay == nil { selectedDay = defaultSelection(in: monthStart) }
+            guard !Task.isCancelled else { return }
+            months[key] = ActivityMonth(fills: fills, containing: monthStart, calendar: calendar)
+            if monthStart == month, selectedDay == nil {
+                selectedDay = defaultSelection(in: monthStart, network: network)
+            }
         } catch {
-            guard cacheNetwork == network, !Task.isCancelled else { return }
-            if months[monthStart] == nil { failedMonths.insert(monthStart) }
+            guard !Task.isCancelled else { return }
+            if months[key] == nil { failedMonths.insert(key) }
         }
     }
 }

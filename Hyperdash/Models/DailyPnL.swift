@@ -2,7 +2,10 @@ import Foundation
 
 /// One executed fill from the `userFillsByTime` info request (aggregated by time).
 /// Only the fields the Activity screen reads are decoded; `feeToken` may be absent.
-struct Fill: Decodable, Equatable {
+struct Fill: Decodable, Equatable, Identifiable {
+    /// Trade id; unique per fill, so pages that overlap on a millisecond can be deduped.
+    let tid: Int
+    var id: Int { tid }
     let coin: String
     let price: Double
     let size: Double
@@ -25,11 +28,12 @@ struct Fill: Decodable, Equatable {
     var realisesPnl: Bool { closedPnl != 0 || dir.hasPrefix("Close") }
 
     private enum CodingKeys: String, CodingKey {
-        case coin, px, sz, side, time, dir, closedPnl, fee, feeToken
+        case tid, coin, px, sz, side, time, dir, closedPnl, fee, feeToken
     }
 
-    init(coin: String, price: Double, size: Double, isBuy: Bool, timeMs: Int,
+    init(tid: Int = 0, coin: String, price: Double, size: Double, isBuy: Bool, timeMs: Int,
          dir: String, closedPnl: Double, fee: Double, feeToken: String? = "USDC") {
+        self.tid = tid
         self.coin = coin
         self.price = price
         self.size = size
@@ -43,6 +47,7 @@ struct Fill: Decodable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        tid = try c.decode(Int.self, forKey: .tid)
         coin = try c.decode(String.self, forKey: .coin)
         price = try c.decode(String.self, forKey: .px).hlDouble
         size = try c.decode(String.self, forKey: .sz).hlDouble
@@ -109,9 +114,16 @@ struct ActivityMonth: Equatable {
         return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
-    /// Blank cells before day 1 in a Monday-first grid.
+    /// Blank cells before day 1, given the calendar's first weekday.
     var leadingBlanks: Int {
-        (calendar.component(.weekday, from: start) + 5) % 7
+        (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
+    }
+
+    /// Column headers in grid order, starting at the calendar's first weekday.
+    var weekdayHeaders: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        guard symbols.count == 7 else { return [] }
+        return (0..<7).map { symbols[(calendar.firstWeekday - 1 + $0) % 7] }
     }
 
     func pnl(on day: Date) -> DailyPnL? {

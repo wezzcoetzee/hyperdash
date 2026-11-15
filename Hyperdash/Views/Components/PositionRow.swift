@@ -95,13 +95,25 @@ struct DexTag: View {
 }
 
 struct DirectionTag: View {
-    let isLong: Bool
+    let label: String
+    let isPositive: Bool
+
+    init(label: String, isPositive: Bool) {
+        self.label = label
+        self.isPositive = isPositive
+    }
+
+    init(isLong: Bool) {
+        self.init(label: isLong ? "LONG" : "SHORT", isPositive: isLong)
+    }
+
     var body: some View {
-        Text(isLong ? "LONG" : "SHORT")
+        Text(label)
+            .textCase(.uppercase)
             .font(.caption2.weight(.bold))
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Color.direction(isPositive: isLong).opacity(Theme.badgeFillOpacity))
-            .foregroundStyle(Color.directionText(isPositive: isLong))
+            .background(Color.direction(isPositive: isPositive).opacity(Theme.badgeFillOpacity))
+            .foregroundStyle(Color.directionText(isPositive: isPositive))
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }

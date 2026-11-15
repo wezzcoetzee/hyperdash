@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Gain/loss colour for a PnL figure, or plain primary when privacy mode is on
+/// so the colour can't leak the sign.
+private func pnlColor(_ value: Double, hidden: Bool) -> Color {
+    hidden ? .primary : .directionText(isPositive: value >= 0)
+}
+
 /// Wallet detail section: this month's net realised PnL, leading into `ActivityView`.
 /// Owns the view model so the pushed screen reuses the month already fetched here.
 struct ActivitySection: View {
@@ -12,7 +18,7 @@ struct ActivitySection: View {
 
     var body: some View {
         Section("Activity") {
-            switch model.state(for: model.currentMonthStart) {
+            switch model.state(for: model.currentMonthStart, network: settings.network) {
             case .failed:
                 HStack {
                     Text("Couldn't load activity")
@@ -43,7 +49,7 @@ struct ActivitySection: View {
                 if let net {
                     Text(Format.signedUSD(net))
                         .monospacedDigit()
-                        .foregroundStyle(Color.directionText(isPositive: net >= 0))
+                        .foregroundStyle(pnlColor(net, hidden: settings.privacyMode))
                         .privacySensitive()
                 } else {
                     Text("No fills").foregroundStyle(.secondary)
@@ -65,7 +71,7 @@ struct ActivityView: View {
 
     var body: some View {
         List {
-            switch model.state {
+            switch model.state(for: model.month, network: settings.network) {
             case .failed:
                 Section {
                     HStack {
@@ -90,8 +96,8 @@ struct ActivityView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("Previous month", systemImage: "chevron.left") { model.step(by: -1) }
-                Button("Next month", systemImage: "chevron.right") { model.step(by: 1) }
+                Button("Previous month", systemImage: "chevron.left") { model.step(by: -1, network: settings.network) }
+                Button("Next month", systemImage: "chevron.right") { model.step(by: 1, network: settings.network) }
                     .disabled(model.isCurrentMonth)
             }
         }
@@ -125,7 +131,7 @@ struct ActivityView: View {
                 Text(isLoading ? "+$0,000.00" : Format.signedUSD(month.net))
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(hidden ? Color.primary : Color.directionText(isPositive: month.net >= 0))
+                    .foregroundStyle(pnlColor(month.net, hidden: hidden))
                     .privacySensitive()
                 Text("realised \(model.isCurrentMonth ? "this month" : "in \(Self.formatted(month.start, "LLLL", month.calendar))") · fees \(Format.usd(month.fees))")
                     .font(.footnote)
@@ -152,7 +158,7 @@ struct ActivityView: View {
         let pnl = month.pnl(on: day)
         return Section {
             if let pnl {
-                ForEach(Array(pnl.fills.enumerated()), id: \.offset) { _, fill in
+                ForEach(pnl.fills) { fill in
                     FillRow(fill: fill)
                 }
             } else {
@@ -183,13 +189,13 @@ private struct CalendarGrid: View {
     let hideTint: Bool
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
-    private let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
+    private var monthName: String { ActivityView.formatted(month.start, "MMMM", month.calendar) }
 
     var body: some View {
         VStack(spacing: 6) {
             LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(weekdays.indices, id: \.self) { index in
-                    Text(weekdays[index])
+                ForEach(Array(month.weekdayHeaders.enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
@@ -200,7 +206,7 @@ private struct CalendarGrid: View {
                     Color.clear.frame(height: 44).accessibilityHidden(true)
                 }
                 ForEach(month.monthDays, id: \.self) { day in
-                    DayCell(day: day, month: month, isSelected: selectedDay == day, hideTint: hideTint)
+                    DayCell(day: day, month: month, monthName: monthName, isSelected: selectedDay == day, hideTint: hideTint)
                         .onTapGesture { selectedDay = day }
                 }
             }
@@ -211,6 +217,7 @@ private struct CalendarGrid: View {
 private struct DayCell: View {
     let day: Date
     let month: ActivityMonth
+    let monthName: String
     let isSelected: Bool
     let hideTint: Bool
 
@@ -246,7 +253,7 @@ private struct DayCell: View {
     }
 
     private var label: String {
-        let date = ActivityView.formatted(day, "d MMMM", month.calendar)
+        let date = "\(month.calendar.component(.day, from: day)) \(monthName)"
         guard let pnl else { return "\(date), no fills" }
         let fills = pnl.fills.count == 1 ? "1 fill" : "\(pnl.fills.count) fills"
         if hideTint { return "\(date), \(fills)" }
@@ -261,25 +268,27 @@ private struct DayCell: View {
 
 private struct FillRow: View {
     let fill: Fill
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(fill.coin).font(.headline)
-                    if !fill.dir.isEmpty { FillDirectionTag(dir: fill.dir, isBuy: fill.isBuy) }
+                    if !fill.dir.isEmpty { DirectionTag(label: fill.dir, isPositive: fill.isBuy) }
                 }
                 Text("\(Format.number(fill.size, fractionDigits: 4)) @ \(Format.price(fill.price)) · \(time)")
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .privacySensitive()
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 1) {
                 if fill.realisesPnl {
                     Text(Format.signedUSD(fill.closedPnl))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.directionText(isPositive: fill.closedPnl >= 0))
+                        .foregroundStyle(pnlColor(fill.closedPnl, hidden: settings.privacyMode))
                 } else {
                     Text("–").font(.subheadline).foregroundStyle(.secondary)
                 }
@@ -300,21 +309,5 @@ private struct FillRow: View {
     private var feeLabel: String {
         if fill.feeIsUSDC { return Format.usd(fill.fee) }
         return "\(Format.number(fill.fee, fractionDigits: 4)) \(fill.feeToken ?? "")"
-    }
-}
-
-/// `DirectionTag`'s styling for Hyperliquid's own direction label.
-private struct FillDirectionTag: View {
-    let dir: String
-    let isBuy: Bool
-
-    var body: some View {
-        Text(dir)
-            .textCase(.uppercase)
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Color.direction(isPositive: isBuy).opacity(Theme.badgeFillOpacity))
-            .foregroundStyle(Color.directionText(isPositive: isBuy))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
