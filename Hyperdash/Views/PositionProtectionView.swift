@@ -271,6 +271,9 @@ struct PriceLadder: View {
     @Binding var stopLoss: Double?
     var onDragStarted: () -> Void = {}
     let onDragEnded: () -> Void
+    /// Counts finished drags. The haptic follows a handle being let go, not a
+    /// scale refit, which candle loads also cause.
+    @State private var drops = 0
 
     static let height: CGFloat = 320
     private static let labelWidth: CGFloat = 44
@@ -305,7 +308,7 @@ struct PriceLadder: View {
         }
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .topLeading)
         .coordinateSpace(name: "ladder")
-        .sensoryFeedback(.impact(weight: .light), trigger: scale)
+        .sensoryFeedback(.impact(weight: .light), trigger: drops)
     }
 
     private func y(_ price: Double) -> CGFloat {
@@ -360,7 +363,10 @@ struct PriceLadder: View {
                         onDragStarted()
                         binding.wrappedValue = clamped(scale.price(at: drag.location.y / Self.height), kind: kind)
                     }
-                    .onEnded { _ in onDragEnded() }
+                    .onEnded { _ in
+                        drops += 1
+                        onDragEnded()
+                    }
             )
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(kind == .takeProfit ? "Take profit" : "Stop loss")
