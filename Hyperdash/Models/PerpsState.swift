@@ -96,11 +96,12 @@ struct Position: Decodable {
 
     /// The position revalued at a new mark. `liquidationPx` is left as reported:
     /// it depends on account-wide margin that only a poll can refresh. ROE is a
-    /// fraction of margin used, as Hyperliquid reports it.
+    /// fraction of the margin at entry (entry notional / leverage), so it
+    /// doesn't drift with the mark the way cross margin used does.
     func repriced(mark: Double) -> Position {
         guard let entry = entryPrice, mark > 0 else { return self }
         let pnl = (mark - entry) * size
-        let margin = marginUsedValue
+        let margin = absoluteSize * entry / Double(max(leverage.value, 1))
         return Position(
             coin: coin, szi: szi, entryPx: entryPx,
             positionValue: String(absoluteSize * mark),

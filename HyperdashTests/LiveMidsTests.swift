@@ -12,7 +12,8 @@ final class LiveMidsTests: XCTestCase {
 
         XCTAssertEqual(position.unrealizedPnlValue, 450, accuracy: 1e-9)
         XCTAssertEqual(position.notionalValue, 3150, accuracy: 1e-9)
-        XCTAssertEqual(position.returnOnEquityValue, 1.5, accuracy: 1e-9)
+        // Entry margin: 1.5 × 1,800 / 10x = 270.
+        XCTAssertEqual(position.returnOnEquityValue, 450.0 / 270.0, accuracy: 1e-9)
         XCTAssertEqual(position.liquidationPrice, 100)
     }
 

@@ -83,8 +83,9 @@ struct HyperdashApp: App {
     /// apply caps repaints at one per second without dropping the latest prices.
     private func followLiveMids() async {
         guard scenePhase == .active else { return }
-        for await mids in MidsFeed.stream(network: settings.network) {
-            walletData.apply(coreMids: mids)
+        let network = settings.network
+        for await mids in MidsFeed.stream(network: network) {
+            walletData.apply(coreMids: mids, network: network)
             try? await Task.sleep(for: .seconds(1))
         }
     }
