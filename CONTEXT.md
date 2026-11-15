@@ -16,7 +16,9 @@ Terms used in code, docs, and conversation. One meaning each; don't drift.
 - **Trade Desk** — the trade-execution module (`TradeDesk`). Everything between the confirmation sheet and the wire: asset resolution, aggressive IOC pricing, action building, Vault key release, signing, submission. Interface: `prepare(context) → Plan`, `execute(plan) → Receipt`.
 - **Plan** — a prepared, not-yet-submitted trade (`TradePlan`): the rows the confirmation sheet shows, an optional warning, and the signed-format action (opaque to callers).
 - **Receipt** — the outcome of an executed trade (`TradeReceipt`), reduced to the message the result screen shows.
-- **Trade context** — which trade the user is confirming (`TradeContext`): close a perps position, cancel an open order, or sell a spot balance to USDC.
+- **Trade context** — which trade the user is confirming (`TradeContext`): open a perps position, close one (whole or a fraction), set its TP/SL, cancel an open order, close everything, or sell a spot balance to USDC.
+- **Order ticket** — a new perp order before the Trade Desk prices it (`OrderTicket`): coin, side, market or limit, dollar notional, leverage, and optional TP/SL as a price move from entry. Edited on the keypad ticket (`OrderTicketView`); opening always sets leverage first.
+- **Protection** — a position's take-profit and stop-loss triggers (`Protection`): reduce-only market triggers held to the valid side of the mark. Attached to an entry as `normalTpsl`, or to an open position as `positionTpsl`, set on the **price ladder** (`PriceLadder`) by tapping the position.
 - **App lock** — the policy gating the UI behind Face ID (`AppLock`): unlocks biometrically, re-locks whenever the app leaves the foreground.
 - **Funding** — perp funding paid or received by a Wallet (`userFunding`), summarised as net 24h, net 7d and a per-coin 7d breakdown (`FundingSummary`). Negative means paid.
 - **Position group** — open positions across every Wallet that share a coin, side and DEX (`PositionGroup`), with total size, combined uPnL and the nearest liquidation distance.

@@ -8,6 +8,8 @@ struct TradeConfirmationView: View {
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: TradeViewModel
+    /// Percent of the position to close, in 25% steps. Only used by a close.
+    @State private var closePercent: Double = 100
 
     init(wallet: Wallet, context: TradeContext, session: HyperliquidSession, onCompleted: @escaping () -> Void) {
         self.wallet = wallet
@@ -34,7 +36,7 @@ struct TradeConfirmationView: View {
                     confirmation
                 }
             }
-            .navigationTitle(context.title)
+            .navigationTitle(model.context.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -48,6 +50,9 @@ struct TradeConfirmationView: View {
 
     private var confirmation: some View {
         Form {
+            if case .closePosition(let position, _) = model.context {
+                closeAmount(position)
+            }
             if let plan = model.plan {
                 Section {
                     ForEach(plan.rows, id: \.0) { row in
@@ -64,18 +69,37 @@ struct TradeConfirmationView: View {
                     }
                 }
                 Section {
-                    Button(role: .destructive) {
+                    Button(role: model.context.isDestructive ? .destructive : nil) {
                         Task { await submit() }
                     } label: {
-                        Text(context.actionVerb).frame(maxWidth: .infinity)
+                        Text(model.context.actionVerb).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(model.isRevising)
                 } footer: {
                     Label("Requires Face ID / passcode. Network: \(settings.network.displayName).",
                           systemImage: "faceid")
                         .font(.caption)
                 }
             }
+        }
+    }
+
+    /// Snaps to 25, 50, 75 and 100%, starting at 100% so a full close takes
+    /// no more steps than it did before partial closes existed.
+    private func closeAmount(_ position: Position) -> some View {
+        Section {
+            LabeledContent("Amount") {
+                Text(Format.percent(closePercent, fractionDigits: 0)).monospacedDigit()
+            }
+            Slider(value: $closePercent, in: 25...100, step: 25)
+                .sensoryFeedback(.selection, trigger: closePercent)
+                .accessibilityValue(Format.percent(closePercent, fractionDigits: 0))
+        }
+        .task(id: closePercent) {
+            let fraction = closePercent / 100
+            guard case .closePosition(_, let current) = model.context, current != fraction else { return }
+            await model.revise(.closePosition(position, fraction: fraction))
         }
     }
 

@@ -61,7 +61,7 @@ enum Fixtures {
     """#
 
     static let perpMeta = #"""
-    {"universe": [{"name": "ETH", "szDecimals": 4}]}
+    {"universe": [{"name": "ETH", "szDecimals": 4, "maxLeverage": 50}]}
     """#
 
     static let portfolio = #"""

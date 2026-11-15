@@ -10,6 +10,8 @@ struct AssetInfo {
     let szDecimals: Int
     let isSpot: Bool
     let midKey: String
+    /// Highest leverage the exchange allows. Spot never borrows, so it stays 1.
+    var maxLeverage = 1
 }
 
 actor MetaService {
@@ -22,7 +24,15 @@ actor MetaService {
         self.client = client
     }
 
-    struct PerpMeta: Decodable { let universe: [Asset]; struct Asset: Decodable { let name: String; let szDecimals: Int } }
+    struct PerpMeta: Decodable {
+        let universe: [Asset]
+        struct Asset: Decodable {
+            let name: String
+            let szDecimals: Int
+            let maxLeverage: Int?
+            let isDelisted: Bool?
+        }
+    }
     struct SpotMeta: Decodable {
         let tokens: [Token]
         let universe: [Pair]
@@ -64,7 +74,14 @@ actor MetaService {
         guard let index = meta.universe.firstIndex(where: { $0.name == coin }) else {
             throw HyperliquidError.exchange("Unknown perp asset \(coin)")
         }
-        return AssetInfo(assetId: index, szDecimals: meta.universe[index].szDecimals, isSpot: false, midKey: coin)
+        let asset = meta.universe[index]
+        return AssetInfo(assetId: index, szDecimals: asset.szDecimals, isSpot: false, midKey: coin,
+                         maxLeverage: asset.maxLeverage ?? 1)
+    }
+
+    /// Core-DEX perps that can still be opened, in the exchange's own order.
+    func tradablePerpCoins() async throws -> [String] {
+        try await perpMeta().universe.filter { $0.isDelisted != true }.map(\.name)
     }
 
     /// Resolves the asset id for an existing open order's `coin` field, which
