@@ -29,11 +29,9 @@ struct PortfolioChartCard: View {
 
             // A redacted chart still draws its line, so privacy mode swaps in a blank plot.
             if redactionReasons.contains(.privacy) {
-                RoundedRectangle(cornerRadius: Theme.surfaceRadius)
-                    .fill(Color.secondary.opacity(0.12))
+                ChartPlaceholder()
                     .frame(maxWidth: .infinity)
                     .frame(height: Self.plotHeight)
-                    .accessibilityHidden(true)
             } else if frame.points.count < 2 {
                 Text("Not enough history yet.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -44,7 +42,7 @@ struct PortfolioChartCard: View {
                 lineChart(frame)
             }
 
-            periodPicker
+            ChartRangePicker(selection: $period, options: PortfolioPeriod.allCases)
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground),
@@ -68,7 +66,14 @@ struct PortfolioChartCard: View {
                     .font(.caption2.weight(.semibold)).tracking(0.5)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if kind == .pnl { styleToggle }
+                if kind == .pnl {
+                    ChartOptionToggle(selection: $pnlStyle, options: PnLChartStyle.allCases,
+                                      accessibilityLabel: { $0.accessibilityLabel }) { option in
+                        Image(systemName: option.symbol)
+                            .imageScale(.small)
+                            .frame(width: 32, height: 28)
+                    }
+                }
             }
 
             if let value = selected?.value ?? frame.points.last?.value {
@@ -112,46 +117,6 @@ struct PortfolioChartCard: View {
                          : Color.directionText(isPositive: change.absolute > 0))
     }
 
-    private var styleToggle: some View {
-        HStack(spacing: 0) {
-            ForEach(PnLChartStyle.allCases, id: \.self) { option in
-                Button { pnlStyle = option } label: {
-                    Image(systemName: option.symbol)
-                        .imageScale(.small)
-                        .foregroundStyle(option == pnlStyle ? Color.primary : Color.secondary)
-                        .frame(width: 32, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.accessibilityLabel)
-                .accessibilityAddTraits(option == pnlStyle ? .isSelected : [])
-            }
-        }
-        .sensoryFeedback(.selection, trigger: pnlStyle)
-    }
-
-    // MARK: - Range picker
-
-    private var periodPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(PortfolioPeriod.allCases) { option in
-                Button { period = option } label: {
-                    Text(option.label)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(option == period ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 32)
-                        .background(option == period ? Color.secondary.opacity(0.18) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 8))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.accessibilityLabel)
-                .accessibilityAddTraits(option == period ? .isSelected : [])
-            }
-        }
-        .sensoryFeedback(.selection, trigger: period)
-    }
-
     // MARK: - Charts
 
     fileprivate static let plotHeight: CGFloat = 172
@@ -171,15 +136,17 @@ struct PortfolioChartCard: View {
                 }
 
                 ForEach(frame.points, id: \.date) { p in
-                    LineMark(x: .value("Time", p.date), y: .value("Value", frame.clamped(p.value)))
+                    LineMark(x: .value("Time", p.date), y: .value("Value", frame.yDomain.clamping(p.value)))
                         .interpolationMethod(.linear)
                         .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .foregroundStyle(color)
                 }
 
                 if let high, let low, high.value != low.value {
-                    extremeLabel(high, position: .top, in: frame)
-                    extremeLabel(low, position: .bottom, in: frame)
+                    ChartMarks.extremeLabel(at: high.date, y: frame.yDomain.clamping(high.value),
+                                            position: .top, text: Format.abbreviatedUSD(high.value))
+                    ChartMarks.extremeLabel(at: low.date, y: frame.yDomain.clamping(low.value),
+                                            position: .bottom, text: Format.abbreviatedUSD(low.value))
                 }
 
                 if let selected {
@@ -272,26 +239,11 @@ struct PortfolioChartCard: View {
             .accessibilityValue(Text(verbatim: frame.accessibilitySummary(kind: kind)))
     }
 
-    /// An invisible point that carries the high/low caption.
-    @ChartContentBuilder
-    private func extremeLabel(_ point: PortfolioPoint, position: AnnotationPosition, in frame: Frame) -> some ChartContent {
-        PointMark(x: .value("Time", point.date), y: .value("Value", frame.clamped(point.value)))
-            .symbolSize(1)
-            .foregroundStyle(.clear)
-            .annotation(position: position, spacing: 2,
-                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
-                Text(Format.abbreviatedUSD(point.value))
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-    }
-
     /// A dot ringed in the card's own background so it stays readable where the
     /// line doubles back under it.
     @ChartContentBuilder
     private func marker(at point: PortfolioPoint, diameter: CGFloat, color: Color, in frame: Frame) -> some ChartContent {
-        let y = frame.clamped(point.value)
+        let y = frame.yDomain.clamping(point.value)
         PointMark(x: .value("Time", point.date), y: .value("Value", y))
             .symbolSize((diameter + 4) * (diameter + 4))
             .foregroundStyle(Color(.secondarySystemGroupedBackground))
@@ -369,8 +321,7 @@ extension PortfolioChartCard {
                         .monospacedDigit()
                 }
 
-                RoundedRectangle(cornerRadius: Theme.surfaceRadius)
-                    .fill(Color.secondary.opacity(0.12))
+                ChartPlaceholder()
                     .frame(maxWidth: .infinity)
                     .frame(height: PortfolioChartCard.plotHeight)
 
@@ -418,13 +369,6 @@ extension PortfolioChartCard {
             self.yDomain = yDomain
             self.xDomain = Self.xDomain(points)
             self.change = Self.change(points, kind: kind)
-        }
-
-        /// Marks plot clamped values: the domain deliberately trims outliers, and
-        /// a point drawn outside it would otherwise be sliced flat by the plot's
-        /// clip. Riding the edge reads as "off the chart" instead of as a glitch.
-        func clamped(_ value: Double) -> Double {
-            min(max(value, yDomain.lowerBound), yDomain.upperBound)
         }
 
         func nearestPoint(to date: Date) -> PortfolioPoint? {

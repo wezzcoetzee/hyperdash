@@ -80,15 +80,15 @@ struct CoinChart: View {
         let dim = scrubbed == nil || scrubbed?.openTime == candle.openTime ? 1.0 : 0.4
         let inset = candle.closeTime.timeIntervalSince(candle.openTime) * 0.15
         RuleMark(x: .value("Time", candle.midTime),
-                 yStart: .value("Low", frame.clamped(candle.low)),
-                 yEnd: .value("High", frame.clamped(candle.high)))
+                 yStart: .value("Low", frame.yDomain.clamping(candle.low)),
+                 yEnd: .value("High", frame.yDomain.clamping(candle.high)))
             .lineStyle(StrokeStyle(lineWidth: 1))
             .foregroundStyle(tint)
             .opacity(dim)
         RectangleMark(xStart: .value("Open time", candle.openTime.addingTimeInterval(inset)),
                       xEnd: .value("Close time", candle.closeTime.addingTimeInterval(-inset)),
-                      yStart: .value("Body low", frame.clamped(min(candle.open, candle.close))),
-                      yEnd: .value("Body high", frame.clamped(max(candle.open, candle.close))))
+                      yStart: .value("Body low", frame.yDomain.clamping(min(candle.open, candle.close))),
+                      yEnd: .value("Body high", frame.yDomain.clamping(max(candle.open, candle.close))))
             .foregroundStyle(tint)
             .opacity(dim)
     }
@@ -102,7 +102,7 @@ struct CoinChart: View {
                 .foregroundStyle(Color.secondary.opacity(0.5))
         }
         ForEach(candles) { candle in
-            LineMark(x: .value("Time", candle.openTime), y: .value("Close", frame.clamped(candle.close)))
+            LineMark(x: .value("Time", candle.openTime), y: .value("Close", frame.yDomain.clamping(candle.close)))
                 .interpolationMethod(.linear)
                 .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 .foregroundStyle(color)
@@ -113,15 +113,17 @@ struct CoinChart: View {
     @ChartContentBuilder
     private func annotations(in frame: Frame) -> some ChartContent {
         if let high = frame.high, let low = frame.low, high.value != low.value {
-            extremeLabel(high, position: .top, in: frame)
-            extremeLabel(low, position: .bottom, in: frame)
+            ChartMarks.extremeLabel(at: high.date, y: frame.yDomain.clamping(high.value),
+                                    position: .top, text: Format.price(high.value))
+            ChartMarks.extremeLabel(at: low.date, y: frame.yDomain.clamping(low.value),
+                                    position: .bottom, text: Format.price(low.value))
         }
         if let scrubbed {
             RuleMark(x: .value("Time", style == .candles ? scrubbed.midTime : scrubbed.openTime))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .foregroundStyle(Color.secondary.opacity(0.35))
             if style == .line {
-                let y = frame.clamped(scrubbed.close)
+                let y = frame.yDomain.clamping(scrubbed.close)
                 PointMark(x: .value("Time", scrubbed.openTime), y: .value("Close", y))
                     .symbolSize(169)
                     .foregroundStyle(Color(.secondarySystemGroupedBackground))
@@ -130,20 +132,6 @@ struct CoinChart: View {
                     .foregroundStyle(color)
             }
         }
-    }
-
-    @ChartContentBuilder
-    private func extremeLabel(_ extreme: Frame.Extreme, position: AnnotationPosition, in frame: Frame) -> some ChartContent {
-        PointMark(x: .value("Time", extreme.date), y: .value("Price", frame.clamped(extreme.value)))
-            .symbolSize(1)
-            .foregroundStyle(.clear)
-            .annotation(position: position, spacing: 2,
-                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
-                Text(Format.price(extreme.value))
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
     }
 
     // MARK: - Scrubbing
@@ -213,12 +201,6 @@ private extension CoinChart {
             }
         }
 
-        /// Marks plot clamped values: a point outside the framed domain would be
-        /// sliced flat by the plot's clip. Riding the edge reads as "off the chart".
-        func clamped(_ value: Double) -> Double {
-            min(max(value, yDomain.lowerBound), yDomain.upperBound)
-        }
-
         var axisFormat: Date.FormatStyle {
             let span = xDomain.upperBound.timeIntervalSince(xDomain.lowerBound)
             switch span {
@@ -240,89 +222,5 @@ extension CoinChart {
         case .month: return .dateTime.month(.abbreviated).day().hour()
         case .quarter, .year: return .dateTime.month(.abbreviated).day().year()
         }
-    }
-
-    /// Stands in at the plot's size while candles load: static, never animated.
-    struct Placeholder: View {
-        var body: some View {
-            RoundedRectangle(cornerRadius: Theme.surfaceRadius)
-                .fill(Color.secondary.opacity(0.12))
-                .redacted(reason: .placeholder)
-                .accessibilityHidden(true)
-        }
-    }
-}
-
-// MARK: - Controls
-
-protocol ChartRangeOption: Identifiable, Hashable {
-    var label: String { get }
-    var accessibilityLabel: String { get }
-}
-
-extension CandleRange: ChartRangeOption {}
-
-/// Range buttons as plain text under a plot; the chosen one is filled.
-struct ChartRangePicker<Option: ChartRangeOption>: View {
-    @Binding var selection: Option
-    let options: [Option]
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(options) { option in
-                Button { selection = option } label: {
-                    Text(option.label)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(option == selection ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 32)
-                        .background(option == selection ? Color.secondary.opacity(0.18) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 8))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.accessibilityLabel)
-                .accessibilityAddTraits(option == selection ? .isSelected : [])
-            }
-        }
-        .sensoryFeedback(.selection, trigger: selection)
-    }
-}
-
-/// Candles or Line. The choice is stored once and shared by every coin chart.
-struct ChartStyleToggle: View {
-    @AppStorage(AppSettings.coinChartStyleKey) private var style: ChartStyle = .standard
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(ChartStyle.allCases) { option in
-                Button { style = option } label: {
-                    Text(option.label)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(option == style ? Color.primary : Color.secondary)
-                        .padding(.horizontal, 8)
-                        .frame(minHeight: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(option == style ? .isSelected : [])
-            }
-        }
-        .sensoryFeedback(.selection, trigger: style)
-    }
-}
-
-/// Something that failed to load: one quiet line and a way back.
-struct ChartRetryRow: View {
-    var message = "Couldn't load the chart."
-    let retry: () -> Void
-
-    var body: some View {
-        HStack {
-            Text(message)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Retry", action: retry)
-        }
-        .font(.caption)
     }
 }

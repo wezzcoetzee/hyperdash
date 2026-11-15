@@ -69,8 +69,9 @@ struct PriceChange: Equatable {
 enum CandleRange: String, CaseIterable, Identifiable {
     case day, week, month, quarter, year
 
-    /// The shorter set the TP/SL ladder offers.
-    static let ladder: [CandleRange] = [.day, .week, .month, .quarter]
+    /// What the TP/SL ladder offers: longer windows swing far outside the
+    /// ladder's price scale and would only draw as streaks along its edges.
+    static let ladder: [CandleRange] = [.day, .week]
 
     var id: String { rawValue }
 
@@ -129,12 +130,6 @@ enum CandleRange: String, CaseIterable, Identifiable {
                 "endTime": Int(now.timeIntervalSince1970 * 1000),
             ] as [String: Any],
         ]
-    }
-}
-
-extension Format {
-    static func signedPrice(_ value: Double) -> String {
-        (value >= 0 ? "+" : "-") + price(abs(value))
     }
 }
 

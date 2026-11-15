@@ -11,12 +11,19 @@ struct CoinMarketSection: View {
     @State private var range: CandleRange = .day
     @State private var scrubbed: Candle?
     @State private var stats: Loadable<CoinStats> = .loading
+    @State private var chartAttempt = 0
+    @State private var statsAttempt = 0
     @AppStorage(AppSettings.coinChartStyleKey) private var style: ChartStyle = .standard
 
     private static let plotHeight: CGFloat = 220
 
     private var request: CoinChartModel.Request {
-        .init(coin: coin, range: range, network: settings.network)
+        .init(coin: coin, range: range, network: settings.network, attempt: chartAttempt)
+    }
+
+    private struct StatsRequest: Hashable {
+        let network: HyperliquidNetwork
+        let attempt: Int
     }
 
     var body: some View {
@@ -26,8 +33,8 @@ struct CoinMarketSection: View {
                 plot
                 ChartRangePicker(selection: $range, options: CandleRange.allCases)
             }
-            .task(id: request) { await loadChart() }
-            .task(id: settings.network) { await loadStats() }
+            .task(id: request) { await chart.load(request, session: settings.session) }
+            .task(id: StatsRequest(network: settings.network, attempt: statsAttempt)) { await loadStats() }
             .onChange(of: range) { _, _ in scrubbed = nil }
             .onChange(of: style) { _, _ in scrubbed = nil }
         }
@@ -100,9 +107,9 @@ struct CoinMarketSection: View {
     private var plot: some View {
         switch chart.candles {
         case .loading:
-            CoinChart.Placeholder().frame(height: Self.plotHeight)
+            ChartPlaceholder().frame(height: Self.plotHeight)
         case .failed:
-            ChartRetryRow { Task { await loadChart() } }
+            ChartRetryRow { chartAttempt += 1 }
                 .frame(maxWidth: .infinity, minHeight: Self.plotHeight)
         case .loaded(let candles) where candles.isEmpty:
             Text("No price history yet.")
@@ -120,7 +127,7 @@ struct CoinMarketSection: View {
     private var statRows: some View {
         switch stats {
         case .failed:
-            ChartRetryRow(message: "Couldn't load market stats.") { Task { await loadStats() } }
+            ChartRetryRow(message: "Couldn't load market stats.") { statsAttempt += 1 }
         case .loading:
             statRow("Funding / 1h", "+0.0000%").redacted(reason: .placeholder)
             statRow("Open interest", "$0.0B").redacted(reason: .placeholder)
@@ -138,18 +145,14 @@ struct CoinMarketSection: View {
 
     // MARK: Loading
 
-    private func loadChart() async {
-        await chart.load(request, session: settings.session)
-    }
-
     private func loadStats() async {
         stats = .loading
         do {
             let loaded = try await settings.session.info.coinStats(coin: coin)
             if Task.isCancelled { return }
-            stats = loaded.map { .loaded($0) } ?? .failed("\(coin) has no market stats.")
+            stats = loaded.map { .loaded($0) } ?? .failed
         } catch {
-            if !Task.isCancelled { stats = .failed(error.userMessage) }
+            if !Task.isCancelled { stats = .failed }
         }
     }
 }

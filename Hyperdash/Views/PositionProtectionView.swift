@@ -22,6 +22,10 @@ struct PositionProtectionView: View {
     @State private var traded = false
     @StateObject private var chart = CoinChartModel()
     @State private var range: CandleRange = .day
+    @State private var chartAttempt = 0
+    /// Low and high of the loaded candles, kept inside the ladder's scale.
+    @State private var chartExtent: [Double] = []
+    @State private var dragging = false
     @AppStorage(AppSettings.coinChartStyleKey) private var chartStyle: ChartStyle = .standard
 
     private let initialTakeProfit: Double?
@@ -58,6 +62,7 @@ struct PositionProtectionView: View {
                             scale: scale, mark: mark, entry: position.entryPrice,
                             liquidation: position.liquidationPrice, isLong: position.isLong,
                             takeProfit: $takeProfit, stopLoss: $stopLoss,
+                            onDragStarted: { dragging = true },
                             onDragEnded: rescale
                         )
                     }
@@ -109,11 +114,17 @@ struct PositionProtectionView: View {
     // MARK: Price chart
 
     private var chartRequest: CoinChartModel.Request {
-        .init(coin: position.coin, range: range, network: settings.network)
+        .init(coin: position.coin, range: range, network: settings.network, attempt: chartAttempt)
     }
 
+    /// The previous candles stay up while a new range loads. Once they land the
+    /// scale refits around them, unless a drag is in flight: that drag's end refits.
     private func loadChart() async {
-        await chart.load(chartRequest, session: settings.session)
+        await chart.load(chartRequest, session: settings.session, keepingPrevious: true)
+        guard !Task.isCancelled else { return }
+        let candles = chart.candles.value ?? []
+        chartExtent = [candles.map(\.low).min(), candles.map(\.high).max()].compactMap { $0 }
+        if !dragging { refit() }
     }
 
     private var chartControls: some View {
@@ -123,7 +134,7 @@ struct PositionProtectionView: View {
                 ChartStyleToggle()
             }
             if case .failed = chart.candles {
-                ChartRetryRow { Task { await loadChart() } }
+                ChartRetryRow { chartAttempt += 1 }
             }
         }
     }
@@ -134,7 +145,7 @@ struct PositionProtectionView: View {
     private var chartBackdrop: some View {
         switch chart.candles {
         case .loading:
-            CoinChart.Placeholder()
+            ChartPlaceholder()
                 .frame(height: PriceLadder.height)
                 .padding(.leading, PriceLadder.axisInset)
         case .loaded(let candles) where !candles.isEmpty:
@@ -227,11 +238,16 @@ struct PositionProtectionView: View {
     }
 
     private func rescale() {
-        scale = Self.scale(position: position, mark: mark, levels: [takeProfit, stopLoss])
+        dragging = false
+        refit()
     }
 
-    private static func scale(position: Position, mark: Double, levels: [Double?]) -> LadderScale {
-        LadderScale(levels: (levels + [position.entryPrice, position.liquidationPrice]).compactMap { $0 }, mark: mark)
+    private func refit() {
+        scale = Self.scale(position: position, mark: mark, levels: [takeProfit, stopLoss], extent: chartExtent)
+    }
+
+    private static func scale(position: Position, mark: Double, levels: [Double?], extent: [Double] = []) -> LadderScale {
+        LadderScale(levels: (levels + [position.entryPrice, position.liquidationPrice]).compactMap { $0 } + extent, mark: mark)
     }
 
     private func finishIfTraded() {
@@ -253,6 +269,7 @@ struct PriceLadder: View {
     let isLong: Bool
     @Binding var takeProfit: Double?
     @Binding var stopLoss: Double?
+    var onDragStarted: () -> Void = {}
     let onDragEnded: () -> Void
 
     static let height: CGFloat = 320
@@ -340,6 +357,7 @@ struct PriceLadder: View {
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("ladder"))
                     .onChanged { drag in
+                        onDragStarted()
                         binding.wrappedValue = clamped(scale.price(at: drag.location.y / Self.height), kind: kind)
                     }
                     .onEnded { _ in onDragEnded() }
