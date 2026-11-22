@@ -14,17 +14,9 @@ struct Candle: Decodable, Equatable, Identifiable {
     var id: Date { openTime }
     var isGain: Bool { close >= open }
     var midTime: Date { openTime.addingTimeInterval(closeTime.timeIntervalSince(openTime) / 2) }
+}
 
-    init(openTime: Date, closeTime: Date, open: Double, high: Double, low: Double, close: Double, volume: Double = 0) {
-        self.openTime = openTime
-        self.closeTime = closeTime
-        self.open = open
-        self.high = high
-        self.low = low
-        self.close = close
-        self.volume = volume
-    }
-
+extension Candle {
     private enum CodingKeys: String, CodingKey { case t, T, o, c, h, l, v }
 
     init(from decoder: Decoder) throws {
@@ -50,13 +42,11 @@ struct Candle: Decodable, Equatable, Identifiable {
     }
 }
 
-/// How far the price moved across a run of candles.
 struct PriceChange: Equatable {
     let absolute: Double
     /// `nil` when the opening price gives nothing to divide by.
     let percent: Double?
 
-    /// First open to last close.
     init?(over candles: [Candle]) {
         guard let first = candles.first, let last = candles.last else { return nil }
         absolute = last.close - first.open
@@ -64,8 +54,6 @@ struct PriceChange: Equatable {
     }
 }
 
-/// The windows a coin chart offers, each paired with the candle size that
-/// keeps the bar count readable (96 to 365).
 enum CandleRange: String, CaseIterable, Identifiable {
     case day, week, month, quarter, year
 
@@ -95,7 +83,6 @@ enum CandleRange: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The `interval` value `candleSnapshot` expects.
     var interval: String {
         switch self {
         case .day: return "15m"
@@ -133,7 +120,6 @@ enum CandleRange: String, CaseIterable, Identifiable {
     }
 }
 
-/// How a coin chart draws its series. One choice, shared by every coin chart.
 enum ChartStyle: String, CaseIterable, Identifiable {
     case candles, line
 

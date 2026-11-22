@@ -1,8 +1,5 @@
 import Foundation
 
-/// Response of the `userAbstraction` info request: the account abstraction mode
-/// an address trades under.
-///
 /// The distinction matters for every valuation question. Under a standard
 /// account the perps and spot clearinghouses hold separate balances, so account
 /// value is their sum. Under unified account and portfolio margin there is one
@@ -13,7 +10,7 @@ import Foundation
 ///
 /// The endpoint has returned both a bare string and an object wrapper across API
 /// revisions, so decoding accepts either shape and treats anything unrecognised
-/// as `.standard` — the pre-existing behaviour.
+/// as `.standard`.
 enum AccountAbstraction: String, Decodable, Equatable {
     case standard
     case unifiedAccount

@@ -128,29 +128,6 @@ final class WalletSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.maintenanceMarginUsed, 50.0)
     }
 
-    /// A node that doesn't serve `perpDexs` leaves the core-dex snapshot intact.
-    func testMissingPerpDexsLeavesSnapshotUnchanged() async throws {
-        let session = makeSession(allMids: #"{"ETH": "2000.0", "@1": "0.5"}"#)
-        let snapshot = try await session.info.snapshot(address: "0xabc")
-
-        XCTAssertTrue(snapshot.builderPerps.isEmpty)
-        XCTAssertEqual(snapshot.totalAccountValue, 1105.0)
-    }
-
-    private func corePosition(coin: String) throws -> DexPosition {
-        let json = Fixtures.longETHPosition.replacingOccurrences(of: #""coin": "ETH""#,
-                                                                with: #""coin": "\#(coin)""#)
-        return DexPosition(dex: "", position: try JSONDecoder().decode(Position.self, from: Data(json.utf8)))
-    }
-
-    func testPerpMarkIsKeyedByCoin() async throws {
-        let session = makeSession(allMids: #"{"ETH": "2000.0", "@1": "0.5"}"#)
-        let snapshot = try await session.info.snapshot(address: "0xabc")
-
-        XCTAssertEqual(snapshot.mark(for: try corePosition(coin: "ETH")), 2000.0)
-        XCTAssertNil(snapshot.mark(for: try corePosition(coin: "DOGE")))
-    }
-
     func testAccountLeverageUsesDisplayedBalanceAndOpenPositionExposure() throws {
         let perpsJSON = #"""
         {

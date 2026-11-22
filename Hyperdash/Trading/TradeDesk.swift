@@ -18,18 +18,12 @@ struct TradePlan {
     init(rows: [(String, String)], warning: String?, action: MsgPackValue) {
         self.init(rows: rows, warning: warning, actions: [action])
     }
-
-    /// The primary action — the only one for single-step plans.
-    var action: MsgPackValue { actions[0] }
 }
 
 struct TradeReceipt {
     let message: String
 }
 
-/// Everything between the trade confirmation sheet and the wire: resolves
-/// assets, prices the order, builds the action, releases the signing key
-/// through the vault, signs, and submits.
 struct TradeDesk {
     let session: HyperliquidSession
     let vault: Vault
@@ -229,9 +223,6 @@ struct TradeDesk {
         )
     }
 
-    /// Flattens the account in up to two signed submissions: one batched
-    /// reduce-only order that markets out every open position, and one batched
-    /// cancel that pulls every resting order.
     private func closeAllPlan(positions: [Position], orders: [OpenOrder]) async throws -> TradePlan {
         guard !positions.isEmpty || !orders.isEmpty else {
             throw HyperliquidError.exchange("Nothing open to close.")

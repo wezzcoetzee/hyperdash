@@ -1,9 +1,5 @@
 import SwiftUI
 
-/// What the eye button reveals while held: the combined total and 24h move,
-/// then every wallet ranked by value with a bar showing its size against the
-/// largest one. Wallets still loading render as redacted placeholders.
-///
 /// Its figures are deliberately not `.privacySensitive()`: the overlay is the
 /// way to reveal values while privacy mode is on.
 struct WalletPeekOverlay: View {
@@ -65,7 +61,6 @@ struct WalletPeekOverlay: View {
     }
 }
 
-/// A thin track filled to `fraction`: neutral, because size is not a signal.
 private struct ShareBar: View {
     let fraction: Double
 

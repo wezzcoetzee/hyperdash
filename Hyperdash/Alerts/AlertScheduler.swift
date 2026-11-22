@@ -2,10 +2,8 @@ import Foundation
 import BackgroundTasks
 import UserNotifications
 
-/// Registers and schedules the background refresh task that drives alerts, and
-/// owns the notification-authorization flow. Delivery is best-effort: iOS
-/// decides when to run the task, so alerts can be delayed. This is the seam a
-/// future push server would replace for real-time liquidation alerts.
+/// Delivery is best-effort: iOS decides when to run the task, so alerts can be
+/// delayed. The seam a future push server would replace for real-time alerts.
 enum AlertScheduler {
     static let taskIdentifier = "com.wcoetzee.hyperdash.alerts.refresh"
 
@@ -25,18 +23,12 @@ enum AlertScheduler {
         }
     }
 
-    /// Queues the next background refresh. Safe to call repeatedly.
     static func schedule() {
         let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         try? BGTaskScheduler.shared.submit(request)
     }
 
-    static func cancel() {
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskIdentifier)
-    }
-
-    /// Prompts for notification permission. Returns whether it is authorized.
     @discardableResult
     static func requestAuthorization() async -> Bool {
         let center = UNUserNotificationCenter.current()

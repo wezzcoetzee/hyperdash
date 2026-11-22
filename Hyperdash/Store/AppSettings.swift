@@ -34,9 +34,7 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// The resolved Hyperliquid environment. Follows `network`; views and
-    /// view models take this instead of re-deriving clients from the raw
-    /// network value.
+    /// Follows `network`; callers take this instead of re-deriving clients.
     private(set) var session: HyperliquidSession
     @Published var biometricLockEnabled: Bool {
         didSet { defaults.set(biometricLockEnabled, forKey: Keys.biometricLock) }
@@ -57,7 +55,6 @@ final class AppSettings: ObservableObject {
         didSet { shared.set(privacyMode, forKey: SharedDefaults.Key.privacyMode) }
     }
 
-    /// The dashboard's section order and visibility, edited in Settings.
     @Published var dashboardLayout: DashboardLayout {
         didSet {
             defaults.set(dashboardLayout.order.map(\.rawValue), forKey: Keys.dashboardOrder)
@@ -75,10 +72,9 @@ final class AppSettings: ObservableObject {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: Keys.chartPeriod) }
     }
 
-    /// Key for `@AppStorage` of `PnLChartStyle`.
     static let pnlChartStyleKey = Keys.pnlChartStyle
 
-    /// Key for `@AppStorage` of `ChartStyle`, shared by every coin price chart.
+    /// Shared by every coin price chart.
     static let coinChartStyleKey = Keys.coinChartStyle
 
     private enum Keys {

@@ -18,11 +18,9 @@ final class TradeViewModel: ObservableObject {
     /// screen, but it no longer matches the inputs, so it can't be submitted.
     @Published private(set) var isRevising = false
 
-    let wallet: Wallet
     private let desk: TradeDesk
 
-    init(wallet: Wallet, context: TradeContext, desk: TradeDesk) {
-        self.wallet = wallet
+    init(context: TradeContext, desk: TradeDesk) {
         self.context = context
         self.desk = desk
     }

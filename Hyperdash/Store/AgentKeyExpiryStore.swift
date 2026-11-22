@@ -2,8 +2,7 @@ import Foundation
 import Combine
 
 /// Resolves agent-key expiry once per wallet so list rows and the dashboard
-/// warning section share the same data. Key access is injected so tests can
-/// avoid the Keychain.
+/// warning section share the same data.
 @MainActor
 final class AgentKeyExpiryStore: ObservableObject {
     @Published private(set) var expiries: [UUID: AgentKeyExpiry] = [:]

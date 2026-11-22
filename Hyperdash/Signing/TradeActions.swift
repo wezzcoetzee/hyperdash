@@ -1,18 +1,14 @@
 import Foundation
 
-/// Builds ordered `MsgPackValue` actions for the `/exchange` endpoint.
 /// Field order is significant and matches the reference SDK exactly.
 enum TradeActions {
     static let defaultSlippage = 0.05
 
-    /// How an order rests (or doesn't) once it reaches the book.
     enum OrderKind {
         /// Fills what it can immediately and cancels the rest. Priced through
         /// the book, this is how the app sends market orders.
         case ioc
-        /// Rests on the book until filled or cancelled.
         case gtc
-        /// A market take-profit or stop-loss that fires at `triggerPrice`.
         case trigger(triggerPrice: Double, isTakeProfit: Bool)
     }
 
@@ -31,7 +27,6 @@ enum TradeActions {
         isBuy ? mark * (1 + slippage) : mark * (1 - slippage)
     }
 
-    /// A single order in the wire format shared by one-off and bulk actions.
     static func orderEntry(
         asset: AssetInfo,
         isBuy: Bool,
@@ -75,7 +70,6 @@ enum TradeActions {
         ordersAction([orderEntry(asset: asset, isBuy: isBuy, price: price, size: size, reduceOnly: reduceOnly)])
     }
 
-    /// Batches several orders into one signed action.
     static func ordersAction(_ orders: [MsgPackValue], grouping: Grouping = .na) -> MsgPackValue {
         .map([
             ("type", .string("order")),
@@ -88,7 +82,6 @@ enum TradeActions {
         cancelsAction([(assetId: assetId, oid: oid)])
     }
 
-    /// Batches several cancels into one signed action.
     static func cancelsAction(_ cancels: [(assetId: Int, oid: Int)]) -> MsgPackValue {
         .map([
             ("type", .string("cancel")),

@@ -13,8 +13,6 @@ final class DashboardViewModel: ObservableObject {
         var exposure = SideExposure(long: .init(), short: .init())
     }
 
-    /// A single wallet's open PnL, both in dollars and as a share of its balance,
-    /// used to rank the best and worst performers.
     struct WalletPnL: Identifiable, Equatable {
         let id: UUID
         let name: String
@@ -79,7 +77,6 @@ final class DashboardViewModel: ObservableObject {
         spotHoldings = Self.mergeSpot(results)
     }
 
-    /// Finds the best and worst wallets by open PnL as a percentage of balance.
     /// Only wallets with a positive balance and non-zero open PnL are ranked, so
     /// idle wallets don't crowd out the leaders. Winner and loser collapse to a
     /// single highlight when one wallet tops both ends.
@@ -105,8 +102,6 @@ final class DashboardViewModel: ObservableObject {
         topDollarWinner = (byDollars?.pnl ?? 0) > 0 && byDollars?.id != topWinner?.id ? byDollars : nil
     }
 
-    /// Merges every wallet's spot balances into one line per coin, summing both
-    /// the token amount and its USD value.
     private static func mergeSpot(_ results: [Entry]) -> [SpotHolding] {
         var merged: [String: (amount: Double, usd: Double, priced: Bool, wallets: Int)] = [:]
         for data in results {

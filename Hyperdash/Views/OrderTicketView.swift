@@ -174,7 +174,6 @@ struct OrderTicketView: View {
         .font(.subheadline)
     }
 
-    /// Common leverage stops up to the coin's maximum, plus the maximum itself.
     private var leverageChoices: [Int] {
         let stops = [1, 2, 3, 5, 10, 20, 25, 40, 50].filter { $0 < model.maxLeverage }
         return stops + [model.maxLeverage]
@@ -255,7 +254,6 @@ struct OrderTicketView: View {
     }
 }
 
-/// Searchable list of the core DEX's tradable perps.
 struct CoinPickerView: View {
     let coins: [String]
     let selected: String

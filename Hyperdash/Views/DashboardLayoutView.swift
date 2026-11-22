@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Settings screen for the dashboard's section order and visibility.
 struct DashboardLayoutView: View {
     @EnvironmentObject private var settings: AppSettings
 

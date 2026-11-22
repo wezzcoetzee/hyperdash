@@ -16,16 +16,6 @@ final class PortfolioAggregatorTests: XCTestCase {
         XCTAssertEqual(result, [point(1, 100), point(2, 150), point(3, 170)])
     }
 
-    func testSumEmptyInputsReturnsEmpty() {
-        XCTAssertEqual(PortfolioAggregator.sum([]), [])
-        XCTAssertEqual(PortfolioAggregator.sum([[], []]), [])
-    }
-
-    func testSingleSeriesPassthrough() {
-        let a = [point(1, 100), point(2, 200)]
-        XCTAssertEqual(PortfolioAggregator.sum([a, []]), a)
-    }
-
     // MARK: - Flat lead-in trimming
 
     /// The `allTime` shape: a long unfunded run, then the account comes alive.

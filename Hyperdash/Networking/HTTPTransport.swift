@@ -1,8 +1,6 @@
 import Foundation
 
-/// Seam between the Hyperliquid client and the network. Production uses
-/// `URLSessionTransport`; tests substitute an in-memory adapter with canned
-/// responses.
+/// Network seam; tests substitute canned responses.
 protocol HTTPTransport: Sendable {
     func post(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }

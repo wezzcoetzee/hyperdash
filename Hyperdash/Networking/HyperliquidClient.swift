@@ -24,14 +24,11 @@ enum HyperliquidError: LocalizedError {
 }
 
 extension Error {
-    /// Message suitable for showing the user.
     var userMessage: String {
         (self as? LocalizedError)?.errorDescription ?? localizedDescription
     }
 }
 
-/// Speaks to the two Hyperliquid endpoints through the transport seam.
-/// `/info` is public; `/exchange` carries signed actions.
 struct HyperliquidClient {
     let network: HyperliquidNetwork
     var transport: HTTPTransport = URLSessionTransport()
@@ -60,7 +57,6 @@ struct HyperliquidClient {
         }
     }
 
-    /// Posts a pre-signed action envelope to `/exchange`.
     func exchange(envelope: [String: Any]) async throws -> ExchangeResponse {
         let data = try await post(path: "exchange", body: envelope)
         do {

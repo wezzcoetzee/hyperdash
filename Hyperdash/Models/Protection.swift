@@ -9,7 +9,6 @@ enum Protection {
         case stopLoss
     }
 
-    /// Whether `price` sits on the side of `reference` where `kind` belongs.
     /// A trigger on the wrong side would fire the moment it's placed.
     static func isValid(_ price: Double, kind: Kind, isLong: Bool, reference: Double) -> Bool {
         let above = price > reference
@@ -39,7 +38,6 @@ enum Protection {
 }
 
 extension OpenOrder {
-    /// The price an existing trigger fires at, and whether it takes profit.
     /// Hyperliquid labels them "Take Profit Market", "Stop Market" and the
     /// limit variants.
     var protectionLevel: (price: Double, kind: Protection.Kind)? {

@@ -1,7 +1,5 @@
 import Foundation
 
-/// Minimal, order-preserving MessagePack encoder.
-///
 /// Hyperliquid's L1 action hash is `keccak256(msgpack(action) || nonce || …)`,
 /// and the reference implementation uses Python's `msgpack.packb`. Field order
 /// is significant, so actions are represented as `MsgPackValue.map([(key, value)])`

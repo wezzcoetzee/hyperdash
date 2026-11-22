@@ -45,7 +45,6 @@ struct PriceAlert: Identifiable, Codable, Equatable {
     var isPending: Bool { isEnabled && triggeredAt == nil }
 }
 
-/// Persisted alert configuration (everything except the transient fired-liquidation set).
 struct AlertConfig: Codable, Equatable {
     var liquidationEnabled: Bool
     var liquidationThresholdPct: Double

@@ -1,7 +1,5 @@
 import Foundation
 
-/// Produces Hyperliquid L1-action signatures.
-///
 /// Scheme (mirrors the official Python SDK):
 ///   1. `connectionId = keccak256(msgpack(action) || nonce_be64 || vaultFlag[+addr])`
 ///   2. phantom agent = `{ source: "a"|"b", connectionId }`
@@ -26,10 +24,6 @@ struct HyperliquidSigner {
         }
         self.network = network
         self.privateKey = key
-    }
-
-    var agentAddress: String {
-        (try? Hex.encode(Secp256k1Signer.address(privateKey: privateKey))) ?? "?"
     }
 
     func signL1Action(_ action: MsgPackValue, nonce: UInt64, vaultAddress: String?) throws -> Signature {

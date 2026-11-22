@@ -1,8 +1,6 @@
 import SwiftUI
 import Charts
 
-/// A portfolio series as a Stocks-style card: a headline that follows the
-/// finger, a quiet plot, and a text range row. PnL can also be drawn as bars.
 struct PortfolioChartCard: View {
     let title: String
     @Binding var period: PortfolioPeriod
@@ -13,7 +11,6 @@ struct PortfolioChartCard: View {
 
     @AppStorage(AppSettings.pnlChartStyleKey) private var pnlStyle: PnLChartStyle = .line
 
-    /// What the user is scrubbing: a reading on the line, or a bar's delta.
     @State private var selected: PortfolioPoint?
     @Environment(\.redactionReasons) private var redactionReasons
 
@@ -53,7 +50,6 @@ struct PortfolioChartCard: View {
 
     // MARK: - Header
 
-    /// Colour of the window as a whole: up, down, or flat.
     private func windowColor(_ frame: Frame) -> Color {
         guard let change = frame.change?.absolute, change != 0 else { return .secondary }
         return .directionText(isPositive: change > 0)

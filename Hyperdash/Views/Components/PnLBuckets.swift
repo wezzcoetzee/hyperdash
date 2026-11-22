@@ -1,19 +1,15 @@
 import Foundation
 
-/// How the PnL card draws its series. Account value is always a line.
 enum PnLChartStyle: String, CaseIterable {
     case line, bars
 }
 
-/// One bar of the PnL chart: what was made or lost within a single bucket.
 struct PnLBar: Equatable {
-    /// Start of the bucket.
     let date: Date
     let delta: Double
 }
 
 enum PnLBuckets {
-    /// Calendar unit one bar spans for a period.
     static func unit(for period: PortfolioPeriod, points: [PortfolioPoint]) -> Calendar.Component {
         switch period {
         case .day: return .hour

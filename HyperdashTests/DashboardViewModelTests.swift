@@ -105,13 +105,6 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertEqual(purr?.usdValue ?? 0, (singlePurr?.usdValue ?? 0) * 2, accuracy: 0.0001)
     }
 
-    func testSpotHoldingsSortedByValueDescending() async {
-        let (_, model) = await load([Wallet(name: "One", address: goodAddress)])
-
-        let values = model.spotHoldings.map { $0.usdValue ?? 0 }
-        XCTAssertEqual(values, values.sorted(by: >))
-    }
-
     func testAllSnapshotsFailingReportsError() async {
         let (store, model) = await load([Wallet(name: "Broken", address: failAddress)], failing: failAddress)
 

@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// The wallet's headline: one dominant total value in the Stocks-style SF
-/// Rounded figure, with the supporting balances as a quiet row beneath it.
-///
 /// A `nil` snapshot renders the loading placeholder from this same layout, so
 /// the skeleton reserves the real geometry and can't drift away from the loaded
 /// card the way a hand-copied one does.

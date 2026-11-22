@@ -100,7 +100,7 @@ struct WalletSnapshot {
         return spot.balances.first(where: \.isUSDC)?.availableValue ?? 0
     }
 
-    /// USDC held in the spot wallet (already dollar-denominated).
+    /// Already dollar-denominated.
     var spotUSDC: Double {
         spot.balances.first(where: \.isUSDC)?.totalValue ?? 0
     }
@@ -121,20 +121,17 @@ struct WalletSnapshot {
         return perp < spotUsdc ? spotUsdc : perp + spotUsdc
     }
 
-    /// Gross open-position exposure divided by the same USDC balance shown on
-    /// the wallet dashboard.
     var accountLeverage: Double {
         let balance = accountBalanceUSDC
         guard balance > 0 else { return 0 }
         return sideExposure.total / balance
     }
 
-    /// Sum of unrealized PnL across all open perp positions, every DEX included.
+    /// Every DEX included.
     var totalUnrealizedPnl: Double {
         openPositions.reduce(0) { $0 + $1.position.unrealizedPnlValue }
     }
 
-    /// Open-position notional exposure split by side, for the short/long ratio bar.
     var sideExposure: SideExposure {
         var long = SideExposure.Side()
         var short = SideExposure.Side()
@@ -164,12 +161,10 @@ struct WalletSnapshot {
         )
     }
 
-    /// Mark price for an open position, read from its own DEX's mids.
     func mark(for position: DexPosition) -> Double? {
         mids[position.dex]?[position.position.coin]
     }
 
-    /// USD value of a spot balance, or nil when no current price is known.
     /// Spot mids are only served alongside the core DEX.
     func usdValue(of balance: SpotBalance) -> Double? {
         if balance.isUSDC { return balance.totalValue }
@@ -193,7 +188,7 @@ struct SideExposure {
     var longShare: Double? { total > 0 ? long.notional / total : nil }
     var shortShare: Double? { total > 0 ? short.notional / total : nil }
 
-    /// Short-to-long exposure ratio, matching the reference dashboard's "short / long".
+    /// Short over long, matching the reference dashboard's "short / long".
     var ratio: Double? { long.notional > 0 ? short.notional / long.notional : nil }
 }
 
@@ -215,12 +210,6 @@ struct ExtraAgent: Decodable, Equatable {
     let validUntil: Date
 
     enum CodingKeys: String, CodingKey { case name, address, validUntil }
-
-    init(name: String, address: String, validUntil: Date) {
-        self.name = name
-        self.address = address
-        self.validUntil = validUntil
-    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -244,8 +233,7 @@ struct InfoService {
         return raw.mapValues { $0.hlDouble }
     }
 
-    /// Perps account state only — used by the alert runner, which needs open
-    /// positions and liquidation prices but not the full spot/orders snapshot.
+    /// Lighter than `snapshot`, for the alert runner.
     func perpsState(address: String) async throws -> PerpsState {
         try await client.info(["type": "clearinghouseState", "user": address], as: PerpsState.self)
     }

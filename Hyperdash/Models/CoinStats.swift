@@ -1,6 +1,5 @@
 import Foundation
 
-/// A perp market's headline numbers from `metaAndAssetCtxs`.
 struct CoinStats: Equatable {
     let markPrice: Double
     /// Funding rate per hour as a fraction, so 0.0000125 is 0.00125%.

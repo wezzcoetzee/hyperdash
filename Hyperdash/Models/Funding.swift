@@ -6,15 +6,11 @@ struct FundingPayment: Decodable, Equatable {
     let time: Date
     let coin: String
     let usdc: Double
+}
 
+extension FundingPayment {
     private enum CodingKeys: String, CodingKey { case time, delta }
     private enum DeltaKeys: String, CodingKey { case coin, usdc }
-
-    init(time: Date, coin: String, usdc: Double) {
-        self.time = time
-        self.coin = coin
-        self.usdc = usdc
-    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -35,7 +31,6 @@ struct FundingSummary: Equatable {
     static let topCoinCount = 5
     static let otherLabel = "Other"
 
-    /// Start of the window the summary covers; fetch history from here.
     static func windowStart(now: Date = Date()) -> Date {
         now.addingTimeInterval(-Double(windowDays) * 24 * 3600)
     }

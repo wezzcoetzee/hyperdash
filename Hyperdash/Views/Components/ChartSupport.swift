@@ -9,7 +9,6 @@ extension ClosedRange {
     }
 }
 
-/// A static grey block standing in for a plot while it loads or is hidden.
 struct ChartPlaceholder: View {
     var body: some View {
         RoundedRectangle(cornerRadius: Theme.surfaceRadius)

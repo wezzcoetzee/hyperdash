@@ -21,8 +21,8 @@ For an L1 action (`order`, `cancel`, `updateLeverage`):
 ## Verification ladder
 
 1. **Unit tests (`⌘U`).** `SigningTests` checks msgpack bytes, the secp256k1
-   vector (privkey 1 → `0x7e5f…95bdf`), a sign→recover round-trip, and action-hash
-   determinism. All must pass. If `import secp256k1` fails to resolve the C
+   vector (privkey 1 → `0x7e5f…95bdf`), and that an L1 signature recovers to the
+   agent's address. All must pass. If `import secp256k1` fails to resolve the C
    symbols, that's the only place to fix — see "secp256k1 API" below.
 
 2. **Cross-check against the Python SDK.** Install `hyperliquid-python-sdk`, sign

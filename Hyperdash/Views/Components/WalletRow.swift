@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// A wallet in the list: identity on the left, its value and 24h move on the
-/// right, positions and leverage underneath. The liquidation flag only appears
-/// once a position is inside the alert threshold.
 struct WalletRow: View {
     let wallet: Wallet
     let hasKey: Bool
@@ -80,7 +77,6 @@ struct WalletRow: View {
 /// otherwise the dollar amount. Sign always leads, so colour is never the only cue.
 struct DayChangeText: View {
     let change: DayChange?
-    /// Shows "+$120.00 (+1.2%)" instead of just the percentage.
     var showsAmount = false
 
     var body: some View {
@@ -128,7 +124,6 @@ struct UpdatedLabel: View {
     }
 }
 
-/// The long-press preview of one wallet: value, 24h move and its largest positions.
 struct WalletPreview: View {
     let wallet: Wallet
     let data: WalletData?

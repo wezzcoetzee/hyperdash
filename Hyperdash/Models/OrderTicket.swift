@@ -12,7 +12,6 @@ struct OrderTicket: Equatable {
     var coin: String
     var isLong: Bool
     var kind: Kind
-    /// Position notional in USD (margin × leverage).
     var notional: Double
     var leverage: Int
     /// Margin mode to set alongside leverage. Kept from an existing position so
@@ -27,7 +26,6 @@ struct OrderTicket: Equatable {
 
     var margin: Double { notional / Double(max(leverage, 1)) }
 
-    /// The price the order is sized and its triggers are placed against.
     func entryPrice(mark: Double) -> Double {
         switch kind {
         case .market: mark

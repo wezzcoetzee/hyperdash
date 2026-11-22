@@ -9,7 +9,6 @@ enum EIP712 {
     private static let chainId: UInt64 = 1337
     private static let verifyingContract = [UInt8](repeating: 0, count: 20)
 
-    /// EIP-712 digest for `Agent(string source, bytes32 connectionId)`.
     static func agentDigest(source: String, connectionId: [UInt8]) -> [UInt8] {
         let separator = domainSeparator()
         let structHash = agentStructHash(source: source, connectionId: connectionId)

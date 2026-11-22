@@ -1,6 +1,5 @@
 import Foundation
 
-/// A pending trade the user is about to confirm.
 enum TradeContext: Identifiable {
     /// `fraction` of the position to close, from 0 (exclusive) to 1.
     case closePosition(Position, fraction: Double = 1)

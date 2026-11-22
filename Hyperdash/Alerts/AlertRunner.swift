@@ -1,10 +1,6 @@
 import Foundation
 import UserNotifications
 
-/// Fetches current market state, runs the pure `AlertEvaluator`, persists the
-/// updated alert state, and delivers local notifications for any fired events.
-/// Invoked both in the foreground (while the app is open) and from the
-/// background refresh task.
 struct AlertRunner {
     let session: HyperliquidSession
     let wallets: [Wallet]
@@ -53,7 +49,6 @@ struct AlertRunner {
     }
 }
 
-/// Seam over notification delivery so the runner stays testable.
 protocol NotificationDelivering {
     func deliver(id: String, title: String, body: String) async
 }

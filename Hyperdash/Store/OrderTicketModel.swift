@@ -1,8 +1,6 @@
 import Foundation
 import Combine
 
-/// State behind the keypad order ticket: what's typed, the coin's live mark
-/// and limits, and the `OrderTicket` it all adds up to.
 @MainActor
 final class OrderTicketModel: ObservableObject {
     enum Field { case amount, price }
@@ -21,7 +19,6 @@ final class OrderTicketModel: ObservableObject {
     @Published private(set) var maxLeverage = 1
     @Published private(set) var coins: [String] = []
 
-    /// Collateral free for new margin, from the wallet's snapshot.
     let available: Double
     private let positions: [Position]
 

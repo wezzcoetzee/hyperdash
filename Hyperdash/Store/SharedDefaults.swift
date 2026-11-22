@@ -12,7 +12,6 @@ enum SharedDefaults {
     enum Key {
         static let addresses = "widget.addresses"
         static let network = "widget.network"
-        /// Set by the app's privacy mode. Widgets render redacted while true.
         static let privacyMode = "privacyMode"
     }
 

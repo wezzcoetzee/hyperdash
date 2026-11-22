@@ -1,6 +1,5 @@
 import Foundation
 
-/// Response of the `spotClearinghouseState` info request.
 struct SpotState: Decodable {
     let balances: [SpotBalance]
 

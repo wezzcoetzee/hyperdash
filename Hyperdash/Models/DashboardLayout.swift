@@ -1,7 +1,7 @@
 import Foundation
 
-/// A movable block on the dashboard. Agent-key warnings are deliberately not a
-/// section: they always sit on top so a lapsed key can't be hidden away.
+/// Agent-key warnings are deliberately not a section: they always sit on top
+/// so a lapsed key can't be hidden away.
 enum DashboardSection: String, CaseIterable, Identifiable {
     case summary, pnlLeaders, spotHoldings, positions, openInterest, accountValueChart, pnlChart
 
@@ -20,7 +20,6 @@ enum DashboardSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// The user's dashboard order and which sections are switched off.
 struct DashboardLayout: Equatable {
     var order: [DashboardSection]
     var hidden: Set<DashboardSection>

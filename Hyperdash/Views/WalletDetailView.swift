@@ -201,7 +201,6 @@ struct WalletDetailView: View {
                         dex: entry.isCore ? nil : entry.dex,
                         markPrice: mark
                     )
-                    // Tapping a tradable position opens its TP/SL ladder.
                     .contentShape(Rectangle())
                     .onTapGesture { if let target { protecting = target } }
                     .accessibilityAction(named: "Take profit and stop loss") { if let target { protecting = target } }
