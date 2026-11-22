@@ -1,6 +1,5 @@
 import Foundation
 
-/// Drives the Activity screen and the wallet detail row that leads into it.
 /// Months are fetched once and cached per network, so a network switch can
 /// never serve another network's numbers.
 @MainActor
@@ -60,8 +59,8 @@ final class ActivityViewModel: ObservableObject {
         return nil
     }
 
-    /// Fetches `monthStart` unless cached. `force` refetches while keeping the
-    /// old numbers on screen, so pull-to-refresh never blanks the calendar.
+    /// `force` refetches while keeping the old numbers on screen, so
+    /// pull-to-refresh never blanks the calendar.
     func load(_ monthStart: Date, session: HyperliquidSession, force: Bool = false) async {
         let network = session.network
         let key = Key(network: network, month: monthStart)

@@ -53,7 +53,6 @@ struct DashboardView: View {
         }
     }
 
-    /// Refresh agent-key expiry when the network changes or wallets are added/removed.
     private var reloadKey: String {
         "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).joined())"
     }
@@ -71,7 +70,6 @@ struct DashboardView: View {
             keyWarnings(warnings)
         }
 
-        // Order and visibility come from Settings → Dashboard layout.
         ForEach(settings.dashboardLayout.visible) { section in
             self.section(section)
         }

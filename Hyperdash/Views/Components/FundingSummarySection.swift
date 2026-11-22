@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// Net funding over 24h and 7d plus a per-coin breakdown. Renders nothing
-/// while loading or without history.
 struct FundingSummarySection: View {
     let state: WalletDetailViewModel.FundingState
     let retry: () -> Void

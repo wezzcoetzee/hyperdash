@@ -1,7 +1,5 @@
 import Foundation
 
-/// Formats prices and sizes into Hyperliquid's wire strings.
-///
 /// Rules (from the API docs):
 ///   • Sizes are rounded to the asset's `szDecimals`.
 ///   • Prices allow ≤ 5 significant figures AND ≤ (MAX_DECIMALS − szDecimals)

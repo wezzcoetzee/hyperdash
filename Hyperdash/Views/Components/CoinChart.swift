@@ -214,7 +214,6 @@ private extension CoinChart {
 }
 
 extension CoinChart {
-    /// What a scrubbed candle's timestamp reads as under the headline.
     static func scrubDateFormat(for range: CandleRange) -> Date.FormatStyle {
         switch range {
         case .day: return .dateTime.hour().minute()

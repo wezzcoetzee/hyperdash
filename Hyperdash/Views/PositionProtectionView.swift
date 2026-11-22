@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// TP/SL for an open position, set on a price ladder: liquidation, entry,
-/// mark and both triggers drawn to scale, with the triggers dragged into
-/// place. Review hands off to the standard confirmation.
 struct PositionProtectionView: View {
     let wallet: Wallet
     let position: Position
@@ -315,7 +312,6 @@ struct PriceLadder: View {
         scale.position(of: price) * Self.height
     }
 
-    /// Faint band between the mark and a trigger: what the move is worth.
     @ViewBuilder
     private func zone(to price: Double?, tint: Color) -> some View {
         if let price {

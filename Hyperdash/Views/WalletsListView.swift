@@ -140,7 +140,6 @@ struct WalletsListView: View {
         store.move(fromOffsets: source, toOffset: destination)
     }
 
-    /// Re-run agent-key expiry refresh when the network changes or wallets are added/removed.
     /// Sorted so reordering wallets doesn't trigger a refresh.
     private var refreshKey: String {
         "\(settings.network.rawValue)-\(store.wallets.map(\.id.uuidString).sorted().joined())"

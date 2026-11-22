@@ -7,8 +7,8 @@ import libsecp256k1
 /// recoverable signature.
 enum Secp256k1Signer {
     struct RecoverableSignature {
-        let r: [UInt8]   // 32 bytes
-        let s: [UInt8]   // 32 bytes
+        let r: [UInt8]
+        let s: [UInt8]
         let v: Int       // 27 or 28
     }
 
@@ -63,30 +63,9 @@ enum Secp256k1Signer {
         return output
     }
 
-    /// Ethereum address (20 bytes) derived from a private key.
     static func address(privateKey: [UInt8]) throws -> [UInt8] {
         let pub = try publicKey(privateKey: privateKey)
         let hash = Keccak.hash256(Array(pub[1..<65]))
-        return Array(hash.suffix(20))
-    }
-
-    /// Recovers the signer address from a digest + recoverable signature.
-    /// Used by tests to prove the signing pipeline round-trips.
-    static func recoverAddress(digest: [UInt8], signature: RecoverableSignature) throws -> [UInt8] {
-        var compact = signature.r + signature.s
-        var recoverable = secp256k1_ecdsa_recoverable_signature()
-        let recid = Int32(signature.v - 27)
-        guard secp256k1_ecdsa_recoverable_signature_parse_compact(context, &recoverable, &compact, recid) == 1 else {
-            throw SignerError.signingFailed
-        }
-        var pubkey = secp256k1_pubkey()
-        guard secp256k1_ecdsa_recover(context, &pubkey, &recoverable, digest) == 1 else {
-            throw SignerError.pubkeyFailed
-        }
-        var output = [UInt8](repeating: 0, count: 65)
-        var length = 65
-        secp256k1_ec_pubkey_serialize(context, &output, &length, &pubkey, UInt32(SECP256K1_EC_UNCOMPRESSED))
-        let hash = Keccak.hash256(Array(output[1..<65]))
         return Array(hash.suffix(20))
     }
 }

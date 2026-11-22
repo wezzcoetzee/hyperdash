@@ -27,8 +27,6 @@ enum PortfolioAggregator {
         return result
     }
 
-    /// Drops the flat lead-in a series carries before the account did anything.
-    ///
     /// Hyperliquid's `allTime` window starts at address creation, so a wallet
     /// funded months later reports a long run of near-constant value. Plotted
     /// as-is that dead run eats half the width and squashes the real history

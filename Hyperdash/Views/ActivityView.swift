@@ -6,7 +6,6 @@ private func pnlColor(_ value: Double, hidden: Bool) -> Color {
     hidden ? .primary : .directionText(isPositive: value >= 0)
 }
 
-/// Wallet detail section: this month's net realised PnL, leading into `ActivityView`.
 /// Owns the view model so the pushed screen reuses the month already fetched here.
 struct ActivitySection: View {
     @EnvironmentObject private var settings: AppSettings
@@ -59,7 +58,6 @@ struct ActivitySection: View {
     }
 }
 
-/// Calendar of daily net realised PnL for one month, with the selected day's fills below.
 struct ActivityView: View {
     @ObservedObject var model: ActivityViewModel
     @EnvironmentObject private var settings: AppSettings

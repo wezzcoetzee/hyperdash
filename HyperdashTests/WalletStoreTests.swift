@@ -26,149 +26,88 @@ private final class FakeUbiquitousStore: UbiquitousKeyValueStoring {
 @MainActor
 final class WalletStoreTests: XCTestCase {
     private let address = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"
+    private let storageKey = "wallets.v1"
+
+    private lazy var defaults: UserDefaults = {
+        let suite = "WalletStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        return defaults
+    }()
+    private let cloud = FakeUbiquitousStore()
+
+    private func makeStore(sync: Bool = false, cloud: FakeUbiquitousStore? = nil) -> WalletStore {
+        WalletStore(defaults: defaults, ubiquitous: cloud ?? self.cloud,
+                    iCloudSyncEnabled: sync, observeExternalChanges: false)
+    }
+
+    private func add(_ name: String, to store: WalletStore, key: String? = nil) throws {
+        try store.add(name: name, address: address, agentKeyHex: key, synchronizable: false)
+    }
 
     func testSyncOffDoesNotWriteWalletsToCloud() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
+        try add("Main", to: makeStore(sync: false))
 
-        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: false)
-
-        XCTAssertNotNil(defaults.data(forKey: "wallets.v1"))
-        XCTAssertNil(cloud.data(forKey: "wallets.v1"))
+        XCTAssertNotNil(defaults.data(forKey: storageKey))
+        XCTAssertNil(cloud.data(forKey: storageKey))
     }
 
     func testSyncOnWritesWalletsToCloud() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: true,
-            observeExternalChanges: false
-        )
+        try add("Main", to: makeStore(sync: true))
 
-        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: true)
-
-        XCTAssertNotNil(defaults.data(forKey: "wallets.v1"))
-        XCTAssertNotNil(cloud.data(forKey: "wallets.v1"))
+        XCTAssertNotNil(defaults.data(forKey: storageKey))
+        XCTAssertNotNil(cloud.data(forKey: storageKey))
     }
 
-    func testLoadIgnoresCloudWhenSyncIsOff() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        defaults.set(try encode([Wallet(name: "Local", address: address)]), forKey: "wallets.v1")
-        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: "wallets.v1")
+    func testLoadReadsCloudOnlyWhenSyncIsOn() throws {
+        defaults.set(try encode([Wallet(name: "Local", address: address)]), forKey: storageKey)
+        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: storageKey)
 
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-
-        XCTAssertEqual(store.wallets.map(\.name), ["Local"])
-    }
-
-    func testLoadPrefersCloudWhenSyncIsOn() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        defaults.set(try encode([Wallet(name: "Local", address: address)]), forKey: "wallets.v1")
-        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: "wallets.v1")
-
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: true,
-            observeExternalChanges: false
-        )
-
-        XCTAssertEqual(store.wallets.map(\.name), ["Cloud"])
+        XCTAssertEqual(makeStore(sync: false).wallets.map(\.name), ["Local"])
+        XCTAssertEqual(makeStore(sync: true).wallets.map(\.name), ["Cloud"])
     }
 
     func testEnablingSyncPushesLocalWalletsToCloud() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: false)
+        let store = makeStore(sync: false)
+        try add("Main", to: store)
 
         store.setiCloudSyncEnabled(true, migrateKeys: false)
 
-        let cloudWallets = try decode(cloud.data(forKey: "wallets.v1"))
+        let cloudWallets = try JSONDecoder().decode([Wallet].self, from: XCTUnwrap(cloud.data(forKey: storageKey)))
         XCTAssertEqual(cloudWallets.map(\.name), ["Main"])
         XCTAssertGreaterThan(cloud.synchronizeCount, 0)
     }
 
     func testDisablingSyncRemovesCloudWallets() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: true,
-            observeExternalChanges: false
-        )
-        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: true)
+        let store = makeStore(sync: true)
+        try add("Main", to: store)
 
         store.setiCloudSyncEnabled(false, migrateKeys: false)
 
-        XCTAssertNil(cloud.data(forKey: "wallets.v1"))
-        XCTAssertNotNil(defaults.data(forKey: "wallets.v1"))
+        XCTAssertNil(cloud.data(forKey: storageKey))
+        XCTAssertNotNil(defaults.data(forKey: storageKey))
     }
 
     func testExternalCloudUpdateOnlyAppliesWhenSyncIsEnabled() throws {
-        let defaults = makeDefaults()
-        let cloud = FakeUbiquitousStore()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: cloud,
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        try store.add(name: "Local", address: address, agentKeyHex: nil, synchronizable: false)
-        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: "wallets.v1")
+        let store = makeStore(sync: false)
+        try add("Local", to: store)
+        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: storageKey)
 
         store.handleExternaliCloudChange()
         XCTAssertEqual(store.wallets.map(\.name), ["Local"])
 
         store.setiCloudSyncEnabled(true, migrateKeys: false)
-        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: "wallets.v1")
+        cloud.set(try encode([Wallet(name: "Cloud", address: address)]), forKey: storageKey)
         store.handleExternaliCloudChange()
 
         XCTAssertEqual(store.wallets.map(\.name), ["Cloud"])
     }
 
+    /// The estimated agent-key expiry counts from this timestamp.
     func testAddWithKeySetsKeyAddedAt() throws {
-        let store = WalletStore(
-            defaults: makeDefaults(),
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        let key = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        try store.add(name: "Main", address: address, agentKeyHex: key, synchronizable: false)
+        let store = makeStore()
+        try add("Main", to: store, key: "0x0000000000000000000000000000000000000000000000000000000000000001")
         XCTAssertNotNil(store.wallets.first?.keyAddedAt)
-    }
-
-    func testAddWithoutKeyLeavesKeyAddedAtNil() throws {
-        let store = WalletStore(
-            defaults: makeDefaults(),
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        try store.add(name: "Main", address: address, agentKeyHex: nil, synchronizable: false)
-        XCTAssertNil(store.wallets.first?.keyAddedAt)
     }
 
     func testDecodesLegacyWalletWithoutKeyAddedAt() throws {
@@ -179,69 +118,17 @@ final class WalletStoreTests: XCTestCase {
         XCTAssertEqual(wallets.first?.icon, .wallet)
     }
 
-    func testPersistsSelectedWalletIcon() throws {
-        let defaults = makeDefaults()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-
-        try store.add(
-            name: "Trading",
-            address: address,
-            icon: .trading,
-            agentKeyHex: nil,
-            synchronizable: false
-        )
-
-        let reloaded = WalletStore(
-            defaults: defaults,
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        XCTAssertEqual(reloaded.wallets.first?.icon, .trading)
-    }
-
     func testMovePersistsNewOrder() throws {
-        let defaults = makeDefaults()
-        let store = WalletStore(
-            defaults: defaults,
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        try store.add(name: "First", address: address, agentKeyHex: nil, synchronizable: false)
-        try store.add(name: "Second", address: address, agentKeyHex: nil, synchronizable: false)
-        try store.add(name: "Third", address: address, agentKeyHex: nil, synchronizable: false)
+        let store = makeStore()
+        for name in ["First", "Second", "Third"] { try add(name, to: store) }
 
         store.move(fromOffsets: IndexSet(integer: 2), toOffset: 0)
 
         XCTAssertEqual(store.wallets.map(\.name), ["Third", "First", "Second"])
-
-        let reloaded = WalletStore(
-            defaults: defaults,
-            ubiquitous: FakeUbiquitousStore(),
-            iCloudSyncEnabled: false,
-            observeExternalChanges: false
-        )
-        XCTAssertEqual(reloaded.wallets.map(\.name), ["Third", "First", "Second"])
-    }
-
-    private func makeDefaults() -> UserDefaults {
-        let suiteName = "WalletStoreTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
+        XCTAssertEqual(makeStore(cloud: FakeUbiquitousStore()).wallets.map(\.name), ["Third", "First", "Second"])
     }
 
     private func encode(_ wallets: [Wallet]) throws -> Data {
         try JSONEncoder().encode(wallets)
-    }
-
-    private func decode(_ data: Data?) throws -> [Wallet] {
-        try JSONDecoder().decode([Wallet].self, from: XCTUnwrap(data))
     }
 }

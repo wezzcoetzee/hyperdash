@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 
-/// One wallet's live data as last fetched.
 struct WalletData {
     let snapshot: WalletSnapshot
     let portfolio: PortfolioResponse
@@ -107,7 +106,6 @@ final class WalletDataStore: ObservableObject {
         }
     }
 
-    /// Fetches one wallet into the cache. Throws when its snapshot can't be loaded.
     func refresh(_ wallet: Wallet, session: HyperliquidSession) async throws {
         adopt(session.network)
         let fresh = try await Self.fetch(wallet, session: session, previous: data[wallet.id]).get()

@@ -103,7 +103,6 @@ actor MetaService {
         throw HyperliquidError.exchange("Unknown order asset \(coin)")
     }
 
-    /// Resolves the "<coin>/USDC" spot pair for selling `coin` into USDC.
     func spotAssetToUSDC(coin: String) async throws -> AssetInfo {
         guard let (pair, token) = try await usdcPair(for: coin) else {
             throw HyperliquidError.exchange("No \(coin)/USDC spot market")

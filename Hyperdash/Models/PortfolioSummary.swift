@@ -1,7 +1,6 @@
 import Foundation
 
-/// Every wallet folded into one glanceable figure: total value, 24h change and
-/// the combined value over the day. Compiled into the widget extension too.
+/// Compiled into the widget extension too.
 struct PortfolioSummary: Equatable {
     let value: Double
     let dayChange: DayChange?

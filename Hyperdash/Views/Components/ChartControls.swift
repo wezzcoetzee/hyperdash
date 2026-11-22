@@ -8,7 +8,6 @@ protocol ChartRangeOption: Identifiable, Hashable {
 extension CandleRange: ChartRangeOption {}
 extension PortfolioPeriod: ChartRangeOption {}
 
-/// Range buttons as plain text under a plot; the chosen one is filled.
 struct ChartRangePicker<Option: ChartRangeOption>: View {
     @Binding var selection: Option
     let options: [Option]
@@ -59,7 +58,6 @@ struct ChartOptionToggle<Option: Hashable, Label: View>: View {
     }
 }
 
-/// Candles or Line. The choice is stored once and shared by every coin chart.
 struct ChartStyleToggle: View {
     @AppStorage(AppSettings.coinChartStyleKey) private var style: ChartStyle = .standard
 
@@ -73,7 +71,6 @@ struct ChartStyleToggle: View {
     }
 }
 
-/// Something that failed to load: one quiet line and a way back.
 struct ChartRetryRow: View {
     var message = "Couldn't load the chart."
     let retry: () -> Void

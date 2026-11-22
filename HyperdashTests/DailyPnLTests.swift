@@ -16,7 +16,7 @@ final class DailyPnLTests: XCTestCase {
     /// A fill at a local wall-clock time in November 2025 (the 1st is a Saturday).
     private func fill(day: Int, hour: Int = 12, minute: Int = 0, pnl: Double = 0, fee: Double = 0,
                       feeToken: String? = "USDC") -> Fill {
-        Fill(coin: "BTC", price: 100, size: 1, isBuy: true,
+        Fill(tid: 0, coin: "BTC", price: 100, size: 1, isBuy: true,
              timeMs: Int(localDate(11, day, hour: hour, minute: minute).timeIntervalSince1970 * 1000),
              dir: "Close Long", closedPnl: pnl, fee: fee, feeToken: feeToken)
     }
@@ -32,9 +32,9 @@ final class DailyPnLTests: XCTestCase {
     }
 
     func testFillsOutsideMonthAreDropped() {
-        let stray = Fill(coin: "ETH", price: 1, size: 1, isBuy: false,
+        let stray = Fill(tid: 0, coin: "ETH", price: 1, size: 1, isBuy: false,
                          timeMs: Int(localDate(10, 31, hour: 23, minute: 59).timeIntervalSince1970 * 1000),
-                         dir: "Sell", closedPnl: 99, fee: 0)
+                         dir: "Sell", closedPnl: 99, fee: 0, feeToken: "USDC")
         XCTAssertEqual(month([stray, fill(day: 1, pnl: 1)]).net, 1)
     }
 

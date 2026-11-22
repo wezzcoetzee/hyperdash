@@ -18,7 +18,6 @@ final class AlertStore: ObservableObject {
         self.config = AlertPersistence.load(from: defaults)
     }
 
-    /// Re-read from storage (e.g. after the background task fired alerts).
     func reload() {
         let loaded = AlertPersistence.load(from: defaults)
         if loaded != config { config = loaded }
@@ -41,7 +40,6 @@ final class AlertStore: ObservableObject {
     }
 }
 
-/// UserDefaults-backed persistence shared by the store (UI) and the runner (background).
 enum AlertPersistence {
     private static let configKey = "alerts.config.v1"
     private static let firedKey = "alerts.firedLiquidations.v1"

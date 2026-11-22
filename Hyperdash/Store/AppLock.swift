@@ -1,8 +1,6 @@
 import SwiftUI
 import Combine
 
-/// Owns the lock policy: unlocks via biometrics and re-locks whenever the app
-/// leaves the foreground.
 @MainActor
 final class AppLock: ObservableObject {
     @Published private(set) var isUnlocked = false

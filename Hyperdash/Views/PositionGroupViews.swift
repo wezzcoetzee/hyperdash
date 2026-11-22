@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Dashboard section: the groups closest to liquidation, with a push to all of them.
 struct PositionGroupsSection: View {
     static let previewCount = 3
 
@@ -74,7 +73,6 @@ struct PositionGroupRow: View {
     }
 }
 
-/// Full list of groups.
 struct AllPositionGroupsView: View {
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var walletData: WalletDataStore
@@ -96,7 +94,6 @@ struct AllPositionGroupsView: View {
     }
 }
 
-/// The wallets holding one group, each pushing to its wallet.
 struct PositionGroupDetailView: View {
     @EnvironmentObject private var store: WalletStore
     @EnvironmentObject private var walletData: WalletDataStore

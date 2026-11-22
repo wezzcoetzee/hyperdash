@@ -1,6 +1,5 @@
 import Foundation
 
-/// Response of the `clearinghouseState` info request (perpetuals account state).
 struct PerpsState: Decodable {
     let marginSummary: MarginSummary
     let crossMarginSummary: MarginSummary
@@ -112,7 +111,6 @@ struct Position: Decodable {
         )
     }
 
-    /// Percentage distance from the given mark price to the liquidation price.
     func liquidationDistancePct(markPrice: Double) -> Double? {
         guard let liq = liquidationPrice, liq > 0, markPrice > 0 else { return nil }
         return abs(markPrice - liq) / markPrice * 100

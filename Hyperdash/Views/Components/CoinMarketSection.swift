@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// A core-DEX coin's market at the top of a detail list, Stocks-style: the
-/// current price as the one headline, the change over the chosen range, the
-/// chart, and a stats section. Renders as two list sections.
 struct CoinMarketSection: View {
     let coin: String
 

@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// The dashboard's headline: one dominant total balance in the Stocks-style
-/// SF Rounded figure, with the rest of the portfolio totals as a quiet
-/// supporting row beneath it.
 struct DashboardSummaryCard: View {
     @EnvironmentObject private var settings: AppSettings
     let totals: DashboardViewModel.Totals
@@ -43,8 +40,6 @@ struct DashboardSummaryCard: View {
     }
 }
 
-/// A row of small supporting metrics beneath a hero figure. Shared by the
-/// dashboard and wallet-detail summaries; collapses to a column when tight.
 struct SummaryMetric: Identifiable {
     var id: String { title }
     let title: String
@@ -87,9 +82,6 @@ struct SummaryMetricsRow: View {
     }
 }
 
-/// A single wallet's open PnL — the dashboard's best and worst performers,
-/// ranked by PnL as a share of balance.
-///
 /// Deliberately a row rather than a card: the balance above is the screen's one
 /// headline, and a pair of equal-weight cards with their own display figures
 /// competes with it.
@@ -187,7 +179,6 @@ struct SpotHoldingsCard: View {
     }
 }
 
-/// Short / long exposure split with a proportional bar, mirroring the dashboard.
 struct ShortLongRatioCard: View {
     let exposure: SideExposure
 

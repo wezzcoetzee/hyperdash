@@ -1,7 +1,6 @@
 import Foundation
 
 /// One executed fill from the `userFillsByTime` info request (aggregated by time).
-/// Only the fields the Activity screen reads are decoded; `feeToken` may be absent.
 struct Fill: Decodable, Equatable, Identifiable {
     /// Trade id; unique per fill, so pages that overlap on a millisecond can be deduped.
     let tid: Int
@@ -26,23 +25,11 @@ struct Fill: Decodable, Equatable, Identifiable {
     /// Closed PnL is zero for fills that open or add to a position, which have
     /// nothing realised; the UI shows a dash for those rather than "$0.00".
     var realisesPnl: Bool { closedPnl != 0 || dir.hasPrefix("Close") }
+}
 
+extension Fill {
     private enum CodingKeys: String, CodingKey {
         case tid, coin, px, sz, side, time, dir, closedPnl, fee, feeToken
-    }
-
-    init(tid: Int = 0, coin: String, price: Double, size: Double, isBuy: Bool, timeMs: Int,
-         dir: String, closedPnl: Double, fee: Double, feeToken: String? = "USDC") {
-        self.tid = tid
-        self.coin = coin
-        self.price = price
-        self.size = size
-        self.isBuy = isBuy
-        self.timeMs = timeMs
-        self.dir = dir
-        self.closedPnl = closedPnl
-        self.fee = fee
-        self.feeToken = feeToken
     }
 
     init(from decoder: Decoder) throws {
@@ -60,11 +47,7 @@ struct Fill: Decodable, Equatable, Identifiable {
     }
 }
 
-/// Realised PnL for one local calendar day.
 struct DailyPnL: Equatable {
-    /// Start of the local day.
-    let day: Date
-    /// Newest first.
     let fills: [Fill]
 
     var closedPnl: Double { fills.reduce(0) { $0 + $1.closedPnl } }
@@ -73,14 +56,12 @@ struct DailyPnL: Equatable {
     var net: Double { closedPnl - fees }
 }
 
-/// A month of fills bucketed by local day, plus the layout and shading
-/// questions the calendar asks. Pure: calendar and time zone are injected.
+/// Pure: calendar and time zone are injected.
 struct ActivityMonth: Equatable {
     /// Tint opacity bounds: a quiet day stays visible, the biggest never hides its label.
     static let opacityRange: ClosedRange<Double> = 0.15...0.85
 
     let calendar: Calendar
-    /// Start of the first day of the month.
     let start: Date
     let days: [Date: DailyPnL]
 
@@ -92,7 +73,7 @@ struct ActivityMonth: Equatable {
         let inMonth = fills.filter { interval.contains($0.time) }
         days = Dictionary(grouping: inMonth) { calendar.startOfDay(for: $0.time) }
             .reduce(into: [:]) { result, entry in
-                result[entry.key] = DailyPnL(day: entry.key, fills: entry.value.sorted { $0.timeMs > $1.timeMs })
+                result[entry.key] = DailyPnL(fills: entry.value.sorted { $0.timeMs > $1.timeMs })
             }
     }
 
@@ -108,18 +89,15 @@ struct ActivityMonth: Equatable {
     var fees: Double { days.values.reduce(0) { $0 + $1.fees } }
     var maxAbsNet: Double { days.values.map { abs($0.net) }.max() ?? 0 }
 
-    /// Every day of the month, in order.
     var monthDays: [Date] {
         let count = calendar.range(of: .day, in: .month, for: start)?.count ?? 0
         return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
-    /// Blank cells before day 1, given the calendar's first weekday.
     var leadingBlanks: Int {
         (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
     }
 
-    /// Column headers in grid order, starting at the calendar's first weekday.
     var weekdayHeaders: [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
         guard symbols.count == 7 else { return [] }

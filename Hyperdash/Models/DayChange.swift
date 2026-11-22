@@ -1,13 +1,10 @@
 import Foundation
 
-/// A wallet's (or several wallets') move over the last 24 hours.
-///
 /// The dollar change comes from the portfolio's `day` PnL history rather than
 /// its account value history, so deposits and withdrawals never read as gains
 /// or losses.
 struct DayChange: Equatable {
     let amount: Double
-    /// Value now, which the percentage is measured back from.
     let value: Double
 
     /// Change relative to the value 24h ago, in percent. Nil when that base is

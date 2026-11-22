@@ -10,7 +10,6 @@ struct PositionGroupKey: Hashable {
     let isLong: Bool
 }
 
-/// Every wallet's position in one market and side, rolled up.
 struct PositionGroup: Identifiable {
     struct Holding: Identifiable {
         let wallet: Wallet
@@ -22,7 +21,6 @@ struct PositionGroup: Identifiable {
     }
 
     let key: PositionGroupKey
-    /// Largest notional first.
     let holdings: [Holding]
 
     var id: PositionGroupKey { key }

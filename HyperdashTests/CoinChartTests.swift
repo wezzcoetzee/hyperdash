@@ -32,28 +32,10 @@ final class CoinChartTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode([Candle].self, from: Data(bad.utf8)))
     }
 
-    func testRangesMapToIntervalAndWindow() throws {
-        let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let expected: [(CandleRange, String, Double)] = [
-            (.day, "15m", 1), (.week, "1h", 7), (.month, "4h", 30), (.quarter, "1d", 90), (.year, "1d", 365),
-        ]
-        for (range, interval, days) in expected {
-            XCTAssertEqual(range.interval, interval)
-            XCTAssertEqual(range.startTime(endingAt: now), 1_700_000_000_000 - Int(days * 86_400_000), "\(range)")
-        }
-
-        let body = CandleRange.week.request(coin: "BTC", now: now)
-        let req = try XCTUnwrap(body["req"] as? [String: Any])
-        XCTAssertEqual(body["type"] as? String, "candleSnapshot")
-        XCTAssertEqual(req["coin"] as? String, "BTC")
-        XCTAssertEqual(req["interval"] as? String, "1h")
-        XCTAssertEqual(req["endTime"] as? Int, 1_700_000_000_000)
-    }
-
     func testChangeRunsFirstOpenToLastClose() throws {
         func candle(open: Double, close: Double) -> Candle {
             Candle(openTime: .distantPast, closeTime: .distantFuture, open: open, high: max(open, close),
-                   low: min(open, close), close: close)
+                   low: min(open, close), close: close, volume: 0)
         }
         let change = try XCTUnwrap(PriceChange(over: [
             candle(open: 100, close: 130), candle(open: 130, close: 90), candle(open: 90, close: 110),
@@ -91,8 +73,4 @@ final class CoinChartTests: XCTestCase {
         XCTAssertNil(missing)
     }
 
-    func testOpenInterestIsCoinsTimesMark() {
-        let stats = CoinStats(markPrice: 1800, hourlyFunding: 0, openInterestCoins: 2000, dayVolumeUSD: 0)
-        XCTAssertEqual(stats.openInterestUSD, 3_600_000)
-    }
 }

@@ -43,7 +43,7 @@ final class TradeDeskTests: XCTestCase {
             size: 1.5,
             reduceOnly: true
         )
-        XCTAssertEqual(plan.action.encoded(), expectedAction.encoded())
+        XCTAssertEqual(plan.actions[0].encoded(), expectedAction.encoded())
 
         let limitRow = try XCTUnwrap(plan.rows.first { $0.0 == "Limit (IOC)" })
         XCTAssertEqual(limitRow.1, Format.price(1900))
@@ -143,7 +143,7 @@ final class TradeDeskTests: XCTestCase {
             price: TradeActions.aggressivePrice(mark: 2000, isBuy: false),
             size: 0.75, reduceOnly: true
         )
-        XCTAssertEqual(plan.action.encoded(), expected.encoded())
+        XCTAssertEqual(plan.actions[0].encoded(), expected.encoded())
     }
 
     func testPrepareOpenMarketSetsLeverageThenAttachesTriggers() async throws {

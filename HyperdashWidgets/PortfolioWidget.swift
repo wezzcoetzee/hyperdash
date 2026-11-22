@@ -1,8 +1,6 @@
 import SwiftUI
 import WidgetKit
 
-/// Total value and 24h change across every tracked wallet, on the home screen
-/// (small, with a day sparkline) and the lock screen (rectangular, inline).
 @main
 struct PortfolioWidget: Widget {
     var body: some WidgetConfiguration {
@@ -83,7 +81,6 @@ struct PortfolioProvider: TimelineProvider {
 }
 
 extension PortfolioEntry {
-    /// Widget gallery and placeholder content.
     static var sample: PortfolioEntry {
         let start = Date.now.addingTimeInterval(-86_400)
         let values = [98_200, 98_900, 98_400, 99_600, 100_300, 99_800, 101_240.0]

@@ -1,6 +1,5 @@
 import Foundation
 
-/// Element of the `frontendOpenOrders` info response.
 struct OpenOrder: Decodable, Identifiable {
     let coin: String
     let side: String

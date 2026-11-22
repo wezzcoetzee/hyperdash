@@ -1,22 +1,17 @@
 import SwiftUI
 
 struct TradeConfirmationView: View {
-    let wallet: Wallet
-    let context: TradeContext
     let onCompleted: () -> Void
 
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: TradeViewModel
-    /// Percent of the position to close, in 25% steps. Only used by a close.
     @State private var closePercent: Double = 100
 
     init(wallet: Wallet, context: TradeContext, session: HyperliquidSession, onCompleted: @escaping () -> Void) {
-        self.wallet = wallet
-        self.context = context
         self.onCompleted = onCompleted
         let desk = TradeDesk(session: session, vault: DeviceVault(), wallet: wallet)
-        _model = StateObject(wrappedValue: TradeViewModel(wallet: wallet, context: context, desk: desk))
+        _model = StateObject(wrappedValue: TradeViewModel(context: context, desk: desk))
     }
 
     var body: some View {

@@ -1,6 +1,5 @@
 import Foundation
 
-/// A fetch that is waiting, done, or failed with something fit to show.
 enum Loadable<Value> {
     case loading
     case loaded(Value)

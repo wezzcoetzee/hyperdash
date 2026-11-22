@@ -71,7 +71,6 @@ struct AddPriceAlertView: View {
     @EnvironmentObject private var alerts: AlertStore
     @Environment(\.dismiss) private var dismiss
 
-    /// Optional prefilled coin (e.g. when opened from a position row).
     var coin: String = ""
 
     @State private var coinInput: String
